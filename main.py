@@ -59,7 +59,7 @@ map_col, info_col = st.columns([2, 1])
 
 with map_col:
     # Create base map
-    m = create_base_map()  # Use the utility function from map_utils.py
+    m = create_base_map()
 
     # Add current landmarks to map if available
     if st.session_state.landmarks:
@@ -74,59 +74,62 @@ with map_col:
     )
 
     # Process map bounds
-    if map_data and "bounds" in map_data:
+    if map_data and "bounds" in map_data and map_data["bounds"]:
         bounds_data = map_data["bounds"]
-        if bounds_data:
-            sw = bounds_data.get("_southWest", {})
-            ne = bounds_data.get("_northEast", {})
+        sw = bounds_data.get("_southWest", {})
+        ne = bounds_data.get("_northEast", {})
 
-            # Only proceed if we have valid coordinates
-            if all(key in sw for key in ["lat", "lng"]) and all(key in ne for key in ["lat", "lng"]):
-                try:
-                    new_bounds = (
-                        float(sw["lat"]),
-                        float(sw["lng"]),
-                        float(ne["lat"]),
-                        float(ne["lng"])
-                    )
+        # Validate coordinates before processing
+        if (isinstance(sw, dict) and isinstance(ne, dict) and
+            all(key in sw for key in ["lat", "lng"]) and
+            all(key in ne for key in ["lat", "lng"]) and
+            all(isinstance(sw[key], (int, float)) for key in ["lat", "lng"]) and
+            all(isinstance(ne[key], (int, float)) for key in ["lat", "lng"])):
 
-                    # Function to check if bounds changed significantly
-                    def bounds_changed_significantly(old, new):
-                        if not old:
-                            return True
+            try:
+                new_bounds = (
+                    float(sw["lat"]),
+                    float(sw["lng"]),
+                    float(ne["lat"]),
+                    float(ne["lng"])
+                )
 
-                        # Calculate the area of the viewport
-                        def get_area(bounds):
-                            width = abs(bounds[3] - bounds[1])
-                            height = abs(bounds[2] - bounds[0])
-                            return width * height
+                # Function to check if bounds changed significantly
+                def bounds_changed_significantly(old, new):
+                    if not old:
+                        return True
 
-                        old_area = get_area(old)
-                        new_area = get_area(new)
+                    # Calculate area change
+                    def get_area(bounds):
+                        width = abs(bounds[3] - bounds[1])
+                        height = abs(bounds[2] - bounds[0])
+                        return width * height
 
-                        # Check if center point moved significantly
-                        old_center = ((old[0] + old[2])/2, (old[1] + old[3])/2)
-                        new_center = ((new[0] + new[2])/2, (new[1] + new[3])/2)
+                    old_area = get_area(old)
+                    new_area = get_area(new)
+                    area_change = abs(old_area - new_area) / max(old_area, 0.0001)
 
-                        center_change = abs(old_center[0] - new_center[0]) + abs(old_center[1] - new_center[1])
+                    # Calculate center change
+                    old_center = ((old[0] + old[2])/2, (old[1] + old[3])/2)
+                    new_center = ((new[0] + new[2])/2, (new[1] + new[3])/2)
+                    center_change = abs(old_center[0] - new_center[0]) + abs(old_center[1] - new_center[1])
 
-                        # Return True if either area or center changed significantly
-                        return abs(old_area - new_area)/old_area > 0.3 or center_change > 0.1
+                    return area_change > 0.3 or center_change > 0.1
 
-                    if bounds_changed_significantly(st.session_state.last_bounds, new_bounds):
-                        with st.spinner("Fetching landmarks..."):
-                            landmarks = cache_landmarks(new_bounds)
-                            if landmarks:
-                                st.session_state.landmarks = landmarks
-                                st.session_state.last_bounds = new_bounds
+                if bounds_changed_significantly(st.session_state.last_bounds, new_bounds):
+                    with st.spinner("Fetching landmarks..."):
+                        landmarks = cache_landmarks(new_bounds)
+                        if landmarks:
+                            st.session_state.landmarks = landmarks
+                            st.session_state.last_bounds = new_bounds
 
-                except Exception as e:
-                    st.error(f"Error processing map bounds: {str(e)}")
+            except Exception as e:
+                st.error(f"Error processing map bounds: {str(e)}")
 
     # Handle clicked location
-    if map_data and "last_clicked" in map_data:
+    if map_data and "last_clicked" in map_data and map_data["last_clicked"]:
         clicked = map_data["last_clicked"]
-        if clicked and "lat" in clicked and "lng" in clicked:
+        if isinstance(clicked, dict) and all(key in clicked for key in ["lat", "lng"]):
             if radius_km > 0:
                 draw_distance_circle(m, (clicked["lat"], clicked["lng"]), radius_km)
 
