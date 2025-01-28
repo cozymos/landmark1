@@ -220,6 +220,11 @@ with info_col:
     for landmark in filtered_landmarks:
         with st.expander(landmark['title']):
             process_landmark_discovery(landmark)
+
+            # Display the landmark image if available
+            if 'image_url' in landmark:
+                st.image(landmark['image_url'], caption=landmark['title'], use_column_width=True)
+
             st.markdown(f"""
             <div style='background-color: #f0f2f6; padding: 1rem; border-radius: 0.5rem;'>
                 <h3 style='margin-top: 0;'>{landmark['title']}</h3>

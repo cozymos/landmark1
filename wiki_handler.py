@@ -8,7 +8,8 @@ class WikiLandmarkFetcher:
     def __init__(self):
         self.wiki = wikipediaapi.Wikipedia(
             'LandmarkExplorer/1.0',
-            'en'
+            'en',
+            extract_format=wikipediaapi.ExtractFormat.WIKI
         )
         self.last_request = 0
         self.min_delay = 1  # Minimum delay between requests in seconds
@@ -18,22 +19,26 @@ class WikiLandmarkFetcher:
             'San Francisco': {
                 'title': 'Golden Gate Bridge',
                 'lat': 37.8199,
-                'lon': -122.4783
+                'lon': -122.4783,
+                'image_url': 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/0c/GoldenGateBridge-001.jpg/1200px-GoldenGateBridge-001.jpg'
             },
             'Alcatraz': {
                 'title': 'Alcatraz Island',
                 'lat': 37.8267,
-                'lon': -122.4233
+                'lon': -122.4233,
+                'image_url': 'https://upload.wikimedia.org/wikipedia/commons/thumb/0/0a/Alcatraz_Island_photo_D_Ramey_Logan.jpg/1200px-Alcatraz_Island_photo_D_Ramey_Logan.jpg'
             },
             'Pier39': {
                 'title': 'Pier 39',
                 'lat': 37.8087,
-                'lon': -122.4098
+                'lon': -122.4098,
+                'image_url': 'https://upload.wikimedia.org/wikipedia/commons/thumb/b/b8/Pier_39_-_San_Francisco%2C_CA_-_USA_-_panoramio.jpg/1200px-Pier_39_-_San_Francisco%2C_CA_-_USA_-_panoramio.jpg'
             },
             'Lombard': {
                 'title': 'Lombard Street',
                 'lat': 37.8021,
-                'lon': -122.4187
+                'lon': -122.4187,
+                'image_url': 'https://upload.wikimedia.org/wikipedia/commons/thumb/1/13/Lombard_Street_San_Francisco.jpg/1200px-Lombard_Street_San_Francisco.jpg'
             }
         }
 
@@ -92,6 +97,7 @@ class WikiLandmarkFetcher:
                             'title': page.title,
                             'summary': page.summary[:200] + "..." if len(page.summary) > 200 else page.summary,
                             'url': page.fullurl,
+                            'image_url': landmark['image_url'],  # Add the image URL
                             'distance': round(distance, 2),
                             'relevance': round(relevance, 2),
                             'coordinates': (landmark['lat'], landmark['lon'])
