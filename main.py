@@ -52,19 +52,20 @@ custom_lon = st.sidebar.number_input("Longitude", value=st.session_state.map_cen
 if st.sidebar.button("Go to Location"):
     st.session_state.map_center = [custom_lat, custom_lon]
     st.session_state.last_bounds = None  # Force refresh
-
-# Create base map with current center
-m = folium.Map(
-    location=st.session_state.map_center,
-    zoom_start=12,
-    tiles='OpenStreetMap',
-    control_scale=True
-)
+    st.experimental_rerun()
 
 # Main map container
 map_col, info_col = st.columns([2, 1])
 
 with map_col:
+    # Create base map with current center
+    m = folium.Map(
+        location=st.session_state.map_center,
+        zoom_start=12,
+        tiles='OpenStreetMap',
+        control_scale=True
+    )
+
     # Display map using st_folium
     map_data = st_folium(
         m,
@@ -110,7 +111,7 @@ with map_col:
                                 st.session_state.last_bounds = bounds
 
                                 # Add landmarks to map with heatmap based on toggle
-                                add_landmarks_to_map(m, landmarks, show_heatmap=show_heatmap)
+                                add_landmarks_to_map(m, landmarks, show_heatmap)
                             except Exception as e:
                                 st.error(f"Error fetching landmarks: {str(e)}")
                                 st.session_state.landmarks = []
