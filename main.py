@@ -14,6 +14,8 @@ st.set_page_config(
 )
 
 # Initialize session state for map persistence
+if 'map_key' not in st.session_state:
+    st.session_state.map_key = 0
 if 'last_bounds' not in st.session_state:
     st.session_state.last_bounds = None
 if 'landmarks' not in st.session_state:
@@ -27,13 +29,12 @@ if 'map_center' not in st.session_state:
 if 'zoom_level' not in st.session_state:
     st.session_state.zoom_level = 12
 
-# Map state management helper functions
 def update_map_state(map_data: dict) -> None:
     """Update map state from folium map data"""
     if not isinstance(map_data, dict):
         return
 
-    # Handle center updates
+    # Update center if available
     center = map_data.get("center")
     if isinstance(center, dict):
         lat = center.get("lat")
@@ -41,12 +42,12 @@ def update_map_state(map_data: dict) -> None:
         if isinstance(lat, (int, float)) and isinstance(lng, (int, float)):
             st.session_state.map_center = [float(lat), float(lng)]
 
-    # Handle zoom updates
+    # Update zoom if available
     zoom = map_data.get("zoom")
     if isinstance(zoom, (int, float)):
         st.session_state.zoom_level = int(zoom)
 
-    # Handle bounds updates
+    # Update bounds and fetch new landmarks if needed
     bounds = map_data.get("bounds")
     if isinstance(bounds, dict):
         sw = bounds.get("_southWest", {})
@@ -99,6 +100,7 @@ custom_lon = st.sidebar.number_input("Longitude", value=st.session_state.map_cen
 if st.sidebar.button("Go to Location"):
     st.session_state.map_center = [custom_lat, custom_lon]
     st.session_state.zoom_level = 12  # Reset zoom when moving to new location
+    st.session_state.map_key += 1  # Force map refresh
 
 # Main map container
 map_col, info_col = st.columns([2, 1])
@@ -116,17 +118,18 @@ with map_col:
         if radius_km > 0:
             draw_distance_circle(m, tuple(st.session_state.map_center), radius_km)
 
-        # Display map with stable key and include center in returned objects
+        # Display map with unique key for state persistence
         map_data = st_folium(
             m,
             width=800,
             height=600,
-            key="landmark_explorer",
+            key=f"landmark_explorer_{st.session_state.map_key}",
             returned_objects=["bounds", "center", "zoom"]
         )
 
         # Update map state if data is available
-        update_map_state(map_data)
+        if map_data is not None:
+            update_map_state(map_data)
 
     except Exception as e:
         st.error(f"Error rendering map: {str(e)}")
