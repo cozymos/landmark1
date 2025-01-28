@@ -2,7 +2,7 @@ import streamlit as st
 import folium
 from streamlit_folium import st_folium
 from wiki_handler import WikiLandmarkFetcher
-from map_utils import create_base_map
+from map_utils import create_base_map, draw_distance_circle
 from cache_manager import cache_landmarks
 import time
 
@@ -18,6 +18,10 @@ if 'last_bounds' not in st.session_state:
     st.session_state.last_bounds = None
 if 'landmarks' not in st.session_state:
     st.session_state.landmarks = []
+if 'selected_landmark' not in st.session_state:
+    st.session_state.selected_landmark = None
+if 'show_heatmap' not in st.session_state:
+    st.session_state.show_heatmap = False
 
 # Title and description
 st.title("🗺️ Local Landmarks Explorer")
@@ -26,10 +30,25 @@ Explore landmarks in your area with information from Wikipedia.
 Pan and zoom the map to discover new locations!
 """)
 
-# Sidebar filters
+# Sidebar controls
+st.sidebar.header("Map Controls")
+
+# Layer toggles
+show_heatmap = st.sidebar.checkbox("Show Heatmap", value=st.session_state.show_heatmap)
+st.session_state.show_heatmap = show_heatmap
+
+# Filters
 st.sidebar.header("Filters")
 search_term = st.sidebar.text_input("Search landmarks", "")
 min_rating = st.sidebar.slider("Minimum relevance score", 0.0, 1.0, 0.3)
+radius_km = st.sidebar.number_input("Show distance circle (km)", min_value=0.0, max_value=50.0, value=0.0, step=0.5)
+
+# Custom location
+st.sidebar.header("Custom Location")
+custom_lat = st.sidebar.number_input("Latitude", value=37.7749, format="%.4f")
+custom_lon = st.sidebar.number_input("Longitude", value=-122.4194, format="%.4f")
+if st.sidebar.button("Go to Location"):
+    st.session_state.last_bounds = None  # Force refresh
 
 # Initialize wiki fetcher
 wiki_fetcher = WikiLandmarkFetcher()
@@ -46,7 +65,7 @@ with map_col:
         m,
         width=800,
         height=600,
-        returned_objects=["bounds"]
+        returned_objects=["bounds", "last_clicked"]
     )
 
     # Get current map bounds if map_data is available
@@ -65,13 +84,22 @@ with map_col:
             if bounds != st.session_state.last_bounds:
                 with st.spinner("Fetching landmarks..."):
                     try:
-                        # Fetch and cache landmarks - removed wiki_fetcher parameter
+                        # Fetch and cache landmarks
                         landmarks = cache_landmarks(bounds)
                         st.session_state.landmarks = landmarks
                         st.session_state.last_bounds = bounds
                     except Exception as e:
                         st.error(f"Error fetching landmarks: {str(e)}")
                         st.session_state.landmarks = []
+
+    # Handle clicked location
+    if map_data is not None and map_data.get("last_clicked"):
+        clicked_lat = map_data["last_clicked"]["lat"]
+        clicked_lon = map_data["last_clicked"]["lng"]
+
+        # Draw distance circle if radius is set
+        if radius_km > 0:
+            draw_distance_circle(m, (clicked_lat, clicked_lon), radius_km)
 
 with info_col:
     # Filter landmarks based on search and rating
@@ -83,14 +111,34 @@ with info_col:
 
     st.subheader(f"Found {len(filtered_landmarks)} Landmarks")
 
-    # Display landmarks
+    # Display landmarks with enhanced cards
     for landmark in filtered_landmarks:
         with st.expander(landmark['title']):
-            st.markdown(f"**Distance:** {landmark['distance']:.1f}km")
-            st.markdown(f"**Relevance:** {landmark['relevance']:.2f}")
-            st.markdown(landmark['summary'])
-            st.markdown(f"[Read more on Wikipedia]({landmark['url']})")
+            # Display landmark details in a card-like format
+            st.markdown(f"""
+            <div style='background-color: #f0f2f6; padding: 1rem; border-radius: 0.5rem;'>
+                <h3 style='margin-top: 0;'>{landmark['title']}</h3>
+                <p><strong>🎯 Relevance:</strong> {landmark['relevance']:.2f}</p>
+                <p><strong>📍 Distance:</strong> {landmark['distance']:.1f}km</p>
+                <p>{landmark['summary']}</p>
+                <a href='{landmark['url']}' target='_blank'>Read more on Wikipedia</a>
+            </div>
+            """, unsafe_allow_html=True)
+
+            # Add buttons for interaction
+            col1, col2 = st.columns(2)
+            with col1:
+                if st.button(f"Show Distance Circle ({landmark['title']})", key=f"circle_{landmark['title']}"):
+                    draw_distance_circle(m, landmark['coordinates'], radius_km if radius_km > 0 else 1.0)
+            with col2:
+                if st.button(f"Center Map ({landmark['title']})", key=f"center_{landmark['title']}"):
+                    st.session_state.selected_landmark = landmark['coordinates']
 
 # Footer
 st.markdown("---")
-st.markdown("Data sourced from Wikipedia. Updates automatically as you explore the map.")
+st.markdown("""
+Data sourced from Wikipedia. Updates automatically as you explore the map.
+* 🔴 Red markers: High relevance landmarks
+* 🟠 Orange markers: Medium relevance landmarks
+* 🔵 Blue markers: Lower relevance landmarks
+""")
