@@ -96,7 +96,7 @@ with map_col:
                             if landmarks:
                                 st.session_state.landmarks = landmarks
                                 st.session_state.last_bounds = new_bounds
-                                st.experimental_rerun()
+                                st.rerun()
                         except Exception as e:
                             st.error(f"Error fetching landmarks: {str(e)}")
             except Exception as e:
@@ -112,7 +112,7 @@ with info_col:
     # Filter landmarks based on search and rating
     filtered_landmarks = [
         l for l in st.session_state.landmarks
-        if (search_term.lower() in l['title'].lower() or not search_term) 
+        if (search_term.lower() in l['title'].lower() or not search_term)
         and l['relevance'] >= min_rating
     ]
 
