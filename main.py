@@ -59,7 +59,7 @@ st.markdown("""
         height: 200px;
         object-fit: cover;
         border-radius: 10px;
-        margin: 10px 0;
+        margin-bottom: 8px;
     }
     .recommendation-card {
         padding: 10px;
@@ -67,6 +67,15 @@ st.markdown("""
         background-color: #f0f2f6;
         margin: 5px;
         height: 100%;
+    }
+    .recommendation-title {
+        font-size: 16px;
+        font-weight: 500;
+        margin: 8px 0;
+    }
+    .recommendation-score {
+        font-size: 14px;
+        color: #555;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -92,9 +101,9 @@ if st.session_state.landmarks:
             with rec_cols[i]:
                 st.markdown(f"""
                 <div class="recommendation-card">
-                    <h4>{landmark['title']}</h4>
                     {'<img src="' + landmark['image_url'] + '" class="recommended-image">' if 'image_url' in landmark else ''}
-                    <p>Score: {landmark['personalized_score']:.2f}</p>
+                    <div class="recommendation-title">{landmark['title']}</div>
+                    <div class="recommendation-score">Score: {landmark['personalized_score']:.2f}</div>
                 </div>
                 """, unsafe_allow_html=True)
                 if st.button("👍 Favorite", key=f"fav_{i}_{landmark['title']}"):
