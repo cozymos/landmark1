@@ -38,7 +38,7 @@ def create_marker_cluster() -> plugins.MarkerCluster:
         icon_create_function=None
     )
 
-def add_landmarks_to_map(m: folium.Map, landmarks: List[Dict]) -> None:
+def add_landmarks_to_map(m: folium.Map, landmarks: List[Dict], show_heatmap: bool = False) -> None:
     """Add landmark markers to the map with clustering"""
     # Create marker cluster
     marker_cluster = create_marker_cluster()
@@ -81,17 +81,18 @@ def add_landmarks_to_map(m: folium.Map, landmarks: List[Dict]) -> None:
     # Add marker cluster to map
     marker_cluster.add_to(m)
 
-    # Add heatmap layer
-    plugins.HeatMap(
-        heat_data,
-        name='Landmark Density',
-        min_opacity=0.3,
-        max_zoom=18,
-        radius=25,
-        blur=15,
-        overlay=True,
-        control=True
-    ).add_to(m)
+    # Add heatmap layer if enabled
+    if show_heatmap and heat_data:
+        plugins.HeatMap(
+            heat_data,
+            name='Landmark Density',
+            min_opacity=0.3,
+            max_zoom=18,
+            radius=25,
+            blur=15,
+            overlay=True,
+            control=True
+        ).add_to(m)
 
     # Add layer control
     folium.LayerControl().add_to(m)

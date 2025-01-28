@@ -2,7 +2,7 @@ import streamlit as st
 import folium
 from streamlit_folium import st_folium
 from wiki_handler import WikiLandmarkFetcher
-from map_utils import create_base_map, draw_distance_circle
+from map_utils import create_base_map, draw_distance_circle, add_landmarks_to_map
 from cache_manager import cache_landmarks
 import time
 
@@ -22,6 +22,8 @@ if 'selected_landmark' not in st.session_state:
     st.session_state.selected_landmark = None
 if 'show_heatmap' not in st.session_state:
     st.session_state.show_heatmap = False
+if 'map_center' not in st.session_state:
+    st.session_state.map_center = [37.7749, -122.4194]
 
 # Title and description
 st.title("🗺️ Local Landmarks Explorer")
@@ -45,16 +47,19 @@ radius_km = st.sidebar.number_input("Show distance circle (km)", min_value=0.0, 
 
 # Custom location
 st.sidebar.header("Custom Location")
-custom_lat = st.sidebar.number_input("Latitude", value=37.7749, format="%.4f")
-custom_lon = st.sidebar.number_input("Longitude", value=-122.4194, format="%.4f")
+custom_lat = st.sidebar.number_input("Latitude", value=st.session_state.map_center[0], format="%.4f")
+custom_lon = st.sidebar.number_input("Longitude", value=st.session_state.map_center[1], format="%.4f")
 if st.sidebar.button("Go to Location"):
+    st.session_state.map_center = [custom_lat, custom_lon]
     st.session_state.last_bounds = None  # Force refresh
 
-# Initialize wiki fetcher
-wiki_fetcher = WikiLandmarkFetcher()
-
-# Create base map
-m = create_base_map()
+# Create base map with current center
+m = folium.Map(
+    location=st.session_state.map_center,
+    zoom_start=12,
+    tiles='OpenStreetMap',
+    control_scale=True
+)
 
 # Main map container
 map_col, info_col = st.columns([2, 1])
@@ -89,6 +94,9 @@ with map_col:
                             landmarks = cache_landmarks(bounds)
                             st.session_state.landmarks = landmarks
                             st.session_state.last_bounds = bounds
+
+                            # Add landmarks to map with heatmap based on toggle
+                            add_landmarks_to_map(m, landmarks, show_heatmap=show_heatmap)
                         except Exception as e:
                             st.error(f"Error fetching landmarks: {str(e)}")
                             st.session_state.landmarks = []
@@ -135,7 +143,8 @@ with info_col:
                     draw_distance_circle(m, landmark['coordinates'], radius_km if radius_km > 0 else 1.0)
             with col2:
                 if st.button(f"Center Map ({landmark['title']})", key=f"center_{landmark['title']}"):
-                    st.session_state.selected_landmark = landmark['coordinates']
+                    st.session_state.map_center = list(landmark['coordinates'])
+                    st.experimental_rerun()
 
 # Footer
 st.markdown("---")
