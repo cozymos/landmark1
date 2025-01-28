@@ -4,20 +4,23 @@ from typing import Tuple
 def create_base_map() -> folium.Map:
     """Create the base Folium map"""
     return folium.Map(
-        location=[0, 0],  # Default to null island
-        zoom_start=2,
+        location=[37.7749, -122.4194],  # Default to San Francisco
+        zoom_start=12,
         tiles='OpenStreetMap',
         control_scale=True
     )
 
 def get_map_bounds(m: folium.Map) -> Tuple[float, float, float, float]:
     """Get the current map bounds"""
-    bounds = m.get_bounds()
+    # Get the southwest and northeast bounds
+    sw = m.get_bounds()[0]
+    ne = m.get_bounds()[1]
+
     return (
-        bounds['_southWest']['lat'],
-        bounds['_southWest']['lng'],
-        bounds['_northEast']['lat'],
-        bounds['_northEast']['lng']
+        sw[0],  # south
+        sw[1],  # west
+        ne[0],  # north
+        ne[1]   # east
     )
 
 def add_landmarks_to_map(m: folium.Map, landmarks: list) -> None:
