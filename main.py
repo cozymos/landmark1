@@ -69,37 +69,40 @@ with map_col:
     )
 
     # Get current map bounds if map_data is available
-    if map_data is not None and map_data.get("bounds") is not None:
-        sw = map_data["bounds"]["_southWest"]
-        ne = map_data["bounds"]["_northEast"]
+    if map_data is not None and "bounds" in map_data:
+        bounds_data = map_data["bounds"]
+        if bounds_data and "_southWest" in bounds_data and "_northEast" in bounds_data:
+            sw = bounds_data["_southWest"]
+            ne = bounds_data["_northEast"]
 
-        if sw and ne:
-            bounds = (
-                float(sw["lat"]),
-                float(sw["lng"]),
-                float(ne["lat"]),
-                float(ne["lng"])
-            )
+            if sw and ne and "lat" in sw and "lng" in sw and "lat" in ne and "lng" in ne:
+                bounds = (
+                    float(sw["lat"]),
+                    float(sw["lng"]),
+                    float(ne["lat"]),
+                    float(ne["lng"])
+                )
 
-            if bounds != st.session_state.last_bounds:
-                with st.spinner("Fetching landmarks..."):
-                    try:
-                        # Fetch and cache landmarks
-                        landmarks = cache_landmarks(bounds)
-                        st.session_state.landmarks = landmarks
-                        st.session_state.last_bounds = bounds
-                    except Exception as e:
-                        st.error(f"Error fetching landmarks: {str(e)}")
-                        st.session_state.landmarks = []
+                if bounds != st.session_state.last_bounds:
+                    with st.spinner("Fetching landmarks..."):
+                        try:
+                            landmarks = cache_landmarks(bounds)
+                            st.session_state.landmarks = landmarks
+                            st.session_state.last_bounds = bounds
+                        except Exception as e:
+                            st.error(f"Error fetching landmarks: {str(e)}")
+                            st.session_state.landmarks = []
 
     # Handle clicked location
-    if map_data is not None and map_data.get("last_clicked"):
-        clicked_lat = map_data["last_clicked"]["lat"]
-        clicked_lon = map_data["last_clicked"]["lng"]
+    if map_data is not None and "last_clicked" in map_data:
+        clicked_data = map_data["last_clicked"]
+        if clicked_data and "lat" in clicked_data and "lng" in clicked_data:
+            clicked_lat = clicked_data["lat"]
+            clicked_lon = clicked_data["lng"]
 
-        # Draw distance circle if radius is set
-        if radius_km > 0:
-            draw_distance_circle(m, (clicked_lat, clicked_lon), radius_km)
+            # Draw distance circle if radius is set
+            if radius_km > 0:
+                draw_distance_circle(m, (clicked_lat, clicked_lon), radius_km)
 
 with info_col:
     # Filter landmarks based on search and rating
