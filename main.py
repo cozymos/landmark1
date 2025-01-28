@@ -65,8 +65,8 @@ with map_col:
             if bounds != st.session_state.last_bounds:
                 with st.spinner("Fetching landmarks..."):
                     try:
-                        # Fetch and cache landmarks
-                        landmarks = cache_landmarks(bounds, wiki_fetcher)
+                        # Fetch and cache landmarks - removed wiki_fetcher parameter
+                        landmarks = cache_landmarks(bounds)
                         st.session_state.landmarks = landmarks
                         st.session_state.last_bounds = bounds
                     except Exception as e:
