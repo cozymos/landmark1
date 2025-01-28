@@ -1,9 +1,9 @@
 import streamlit as st
 import folium
 from streamlit_folium import st_folium
-from wiki_handler import WikiLandmarkFetcher
+from google_places import GooglePlacesHandler
 from map_utils import create_base_map, draw_distance_circle, add_landmarks_to_map
-from cache_manager import cache_landmarks
+from cache_manager import get_cached_landmarks
 import time
 from urllib.parse import quote, unquote
 import json
@@ -46,7 +46,7 @@ if 'journey_tracker' not in st.session_state:
 # Title and description
 st.title("🗺️ Local Landmarks Explorer")
 st.markdown("""
-Explore landmarks in your area with information from Wikipedia. 
+Explore landmarks in your area with information from Google Places. 
 Pan and zoom the map to discover new locations!
 """)
 
@@ -177,7 +177,6 @@ with map_col:
                         if (st.session_state.last_bounds is None or
                             new_bounds != st.session_state.last_bounds):
                             try:
-                                from cache_manager import get_cached_landmarks
                                 landmarks = get_cached_landmarks(new_bounds, st.session_state.zoom_level)
                                 if landmarks:
                                     st.session_state.landmarks = landmarks
@@ -231,14 +230,14 @@ with info_col:
                 <p><strong>🎯 Relevance:</strong> {landmark['relevance']:.2f}</p>
                 <p><strong>📍 Distance:</strong> {landmark['distance']:.1f}km</p>
                 <p>{landmark['summary']}</p>
-                <a href='{landmark['url']}' target='_blank'>Read more on Wikipedia</a>
+                <a href='{landmark['url']}' target='_blank'>Read more on Google Places</a>
             </div>
             """, unsafe_allow_html=True)
 
 # Footer
 st.markdown("---")
 st.markdown("""
-Data sourced from Wikipedia. Updates automatically as you explore the map.
+Data sourced from Google Places. Updates automatically as you explore the map.
 * 🔴 Red markers: High relevance landmarks
 * 🟠 Orange markers: Medium relevance landmarks
 * 🔵 Blue markers: Lower relevance landmarks

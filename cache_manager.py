@@ -18,9 +18,9 @@ def cache_landmarks(
     # Round bounds to reduce cache fragmentation
     rounded_bounds = tuple(round(b, 3) for b in bounds)
 
-    from wiki_handler import WikiLandmarkFetcher
-    wiki_fetcher = WikiLandmarkFetcher()
-    return wiki_fetcher.get_landmarks(rounded_bounds)
+    from google_places import GooglePlacesHandler
+    places_handler = GooglePlacesHandler()
+    return places_handler.get_landmarks(rounded_bounds)
 
 def get_cached_landmarks(
     bounds: Tuple[float, float, float, float],

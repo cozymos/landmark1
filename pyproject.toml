@@ -9,4 +9,6 @@ dependencies = [
     "streamlit>=1.41.1",
     "wikipedia-api>=0.8.1",
     "geopy>=2.4.1",
+    "googlemaps>=4.10.0",
+    "branca>=0.8.1",
 ]
