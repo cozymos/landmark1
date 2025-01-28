@@ -52,7 +52,7 @@ custom_lon = st.sidebar.number_input("Longitude", value=st.session_state.map_cen
 if st.sidebar.button("Go to Location"):
     st.session_state.map_center = [custom_lat, custom_lon]
     st.session_state.last_bounds = None
-    st.rerun()
+
 
 # Main map container
 map_col, info_col = st.columns([2, 1])
@@ -133,7 +133,6 @@ with info_col:
             with col2:
                 if st.button(f"Center Map ({landmark['title']})", key=f"center_{landmark['title']}"):
                     st.session_state.map_center = list(landmark['coordinates'])
-                    st.rerun()
 
 # Footer
 st.markdown("---")
