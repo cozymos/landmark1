@@ -40,7 +40,7 @@ def create_marker_cluster() -> plugins.MarkerCluster:
 
 def add_landmarks_to_map(m: folium.Map, landmarks: List[Dict], show_heatmap: bool = False) -> None:
     """Add landmark markers to the map with clustering and optional heatmap"""
-    # Create marker cluster
+    # Create marker cluster and add to map
     marker_cluster = create_marker_cluster()
     marker_cluster.add_to(m)
 
@@ -70,37 +70,28 @@ def add_landmarks_to_map(m: folium.Map, landmarks: List[Dict], show_heatmap: boo
         )
         marker.add_to(marker_cluster)
 
-        # Add to heatmap data with scaled weight
+        # Add to heatmap data
         heat_data.append([
             landmark['coordinates'][0],
             landmark['coordinates'][1],
-            landmark['relevance'] * 1000  # Scale up the weight significantly
+            landmark['relevance'] * 100  # Scale weight for visibility
         ])
 
-    # Create heatmap layer
+    # Add heatmap if there's data
     if heat_data:
-        heatmap = plugins.HeatMap(
+        plugins.HeatMap(
             data=heat_data,
             name='Heatmap',
-            min_opacity=0.5,
+            min_opacity=0.3,
             max_zoom=18,
-            radius=15,
-            blur=10,
-            max_val=1000,  # Match the scaled weight
-            gradient={
-                0.4: '#1E90FF',  # Bright blue
-                0.6: '#32CD32',  # Lime green
-                0.8: '#FFA500',  # Orange
-                1.0: '#FF0000'   # Red
-            }
-        )
+            radius=25,
+            blur=15,
+            overlay=True,
+            control=True,
+            show=show_heatmap
+        ).add_to(m)
 
-        # Create a separate feature group for the heatmap
-        heatmap_group = folium.FeatureGroup(name='Heatmap', show=show_heatmap)
-        heatmap.add_to(heatmap_group)
-        heatmap_group.add_to(m)
-
-    # Add layer control last
+    # Add layer control
     folium.LayerControl().add_to(m)
 
 def draw_distance_circle(m: folium.Map, center: Tuple[float, float], radius_km: float):

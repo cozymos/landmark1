@@ -25,15 +25,6 @@ if 'show_heatmap' not in st.session_state:
 if 'map_center' not in st.session_state:
     st.session_state.map_center = [37.7749, -122.4194]
 
-# Create base map function to ensure consistent map creation
-def create_map():
-    return folium.Map(
-        location=st.session_state.map_center,
-        zoom_start=12,
-        tiles='OpenStreetMap',
-        control_scale=True
-    )
-
 # Title and description
 st.title("🗺️ Local Landmarks Explorer")
 st.markdown("""
@@ -44,11 +35,10 @@ Pan and zoom the map to discover new locations!
 # Sidebar controls
 st.sidebar.header("Map Controls")
 
-# Layer toggles with improved state management
+# Layer toggles
 show_heatmap = st.sidebar.checkbox("Show Heatmap", value=st.session_state.show_heatmap)
 if show_heatmap != st.session_state.show_heatmap:
     st.session_state.show_heatmap = show_heatmap
-    st.session_state.last_bounds = None  # Force refresh
     st.rerun()
 
 # Filters
@@ -63,98 +53,82 @@ custom_lat = st.sidebar.number_input("Latitude", value=st.session_state.map_cent
 custom_lon = st.sidebar.number_input("Longitude", value=st.session_state.map_center[1], format="%.4f")
 if st.sidebar.button("Go to Location"):
     st.session_state.map_center = [custom_lat, custom_lon]
-    st.session_state.last_bounds = None  # Force refresh
     st.rerun()
 
 # Main map container
 map_col, info_col = st.columns([2, 1])
 
 with map_col:
-    try:
-        # Create fresh map instance
-        m = create_map()
+    # Create base map
+    m = folium.Map(
+        location=st.session_state.map_center,
+        zoom_start=12,
+        tiles='OpenStreetMap',
+        control_scale=True
+    )
 
-        # Display map using st_folium
-        map_data = st_folium(
-            m,
-            width=800,
-            height=600,
-            returned_objects=["bounds", "last_clicked"]
-        )
+    # Add current landmarks to map if available
+    if st.session_state.landmarks:
+        add_landmarks_to_map(m, st.session_state.landmarks, st.session_state.show_heatmap)
 
-        # Process map bounds
-        if (map_data and 
-            isinstance(map_data, dict) and 
-            "bounds" in map_data and 
-            map_data["bounds"]):
+    # Display map using st_folium
+    map_data = st_folium(
+        m,
+        width=800,
+        height=600,
+        returned_objects=["bounds", "last_clicked"]
+    )
 
-            bounds_data = map_data["bounds"]
-            if (isinstance(bounds_data, dict) and 
-                "_southWest" in bounds_data and 
-                "_northEast" in bounds_data):
+    # Process map bounds
+    if (map_data and 
+        isinstance(map_data, dict) and 
+        "bounds" in map_data and 
+        map_data["bounds"]):
 
-                sw = bounds_data["_southWest"]
-                ne = bounds_data["_northEast"]
+        bounds_data = map_data["bounds"]
+        if (isinstance(bounds_data, dict) and 
+            "_southWest" in bounds_data and 
+            "_northEast" in bounds_data):
 
-                if (sw and ne and 
-                    isinstance(sw, dict) and isinstance(ne, dict) and
-                    all(key in sw for key in ["lat", "lng"]) and 
-                    all(key in ne for key in ["lat", "lng"]) and
-                    all(isinstance(sw[key], (int, float)) for key in ["lat", "lng"]) and
-                    all(isinstance(ne[key], (int, float)) for key in ["lat", "lng"])):
+            sw = bounds_data["_southWest"]
+            ne = bounds_data["_northEast"]
 
-                    bounds = (
-                        float(sw["lat"]),
-                        float(sw["lng"]),
-                        float(ne["lat"]),
-                        float(ne["lng"])
-                    )
+            if (sw and ne and 
+                isinstance(sw, dict) and isinstance(ne, dict) and
+                all(key in sw for key in ["lat", "lng"]) and 
+                all(key in ne for key in ["lat", "lng"])):
 
-                    # Only fetch new landmarks if bounds changed
-                    if bounds != st.session_state.last_bounds:
-                        with st.spinner("Fetching landmarks..."):
-                            try:
-                                # Create fresh map for adding landmarks
-                                m = create_map()
-                                landmarks = cache_landmarks(bounds)
-                                st.session_state.landmarks = landmarks
-                                st.session_state.last_bounds = bounds
+                bounds = (
+                    float(sw["lat"]),
+                    float(sw["lng"]),
+                    float(ne["lat"]),
+                    float(ne["lng"])
+                )
 
-                                # Add landmarks to fresh map with current heatmap state
-                                add_landmarks_to_map(m, landmarks, st.session_state.show_heatmap)
-                            except Exception as e:
-                                st.error(f"Error fetching landmarks: {str(e)}")
-                                st.session_state.landmarks = []
+                # Only fetch new landmarks if bounds changed
+                if bounds != st.session_state.last_bounds:
+                    with st.spinner("Fetching landmarks..."):
+                        landmarks = cache_landmarks(bounds)
+                        st.session_state.landmarks = landmarks
+                        st.session_state.last_bounds = bounds
+                        st.rerun()
 
-        # Handle clicked location with fresh map
-        if (map_data and 
-            isinstance(map_data, dict) and 
-            "last_clicked" in map_data and 
-            map_data["last_clicked"]):
+    # Handle clicked location
+    if (map_data and 
+        isinstance(map_data, dict) and 
+        "last_clicked" in map_data and 
+        map_data["last_clicked"]):
 
-            clicked_data = map_data["last_clicked"]
-            if (isinstance(clicked_data, dict) and 
-                "lat" in clicked_data and 
-                "lng" in clicked_data and
-                isinstance(clicked_data["lat"], (int, float)) and
-                isinstance(clicked_data["lng"], (int, float))):
+        clicked_data = map_data["last_clicked"]
+        if (isinstance(clicked_data, dict) and 
+            "lat" in clicked_data and 
+            "lng" in clicked_data):
 
-                clicked_lat = clicked_data["lat"]
-                clicked_lon = clicked_data["lng"]
+            clicked_lat = clicked_data["lat"]
+            clicked_lon = clicked_data["lng"]
 
-                # Create fresh map for distance circle
-                m = create_map()
-
-                # Add current landmarks to fresh map
-                if st.session_state.landmarks:
-                    add_landmarks_to_map(m, st.session_state.landmarks, st.session_state.show_heatmap)
-
-                # Draw distance circle if radius is set
-                if radius_km > 0:
-                    draw_distance_circle(m, (clicked_lat, clicked_lon), radius_km)
-
-    except Exception as e:
-        st.error(f"Error with map interaction: {str(e)}")
+            if radius_km > 0:
+                draw_distance_circle(m, (clicked_lat, clicked_lon), radius_km)
 
 with info_col:
     # Filter landmarks based on search and rating
