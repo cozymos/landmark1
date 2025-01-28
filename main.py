@@ -51,6 +51,26 @@ if 'journey_tracker' not in st.session_state:
 if 'recommender' not in st.session_state:
     st.session_state.recommender = LandmarkRecommender()
 
+# CSS styling for recommendations
+st.markdown("""
+<style>
+    .recommended-image {
+        width: 100%;
+        height: 200px;
+        object-fit: cover;
+        border-radius: 10px;
+        margin: 10px 0;
+    }
+    .recommendation-card {
+        padding: 10px;
+        border-radius: 10px;
+        background-color: #f0f2f6;
+        margin: 5px;
+        height: 100%;
+    }
+</style>
+""", unsafe_allow_html=True)
+
 # Title and description
 st.title("🗺️ Local Landmarks Explorer")
 st.markdown("""
@@ -70,10 +90,13 @@ if st.session_state.landmarks:
         rec_cols = st.columns(len(recommendations))
         for i, landmark in enumerate(recommendations):
             with rec_cols[i]:
-                st.markdown(f"**{landmark['title']}**")
-                if 'image_url' in landmark:
-                    st.image(landmark['image_url'], use_container_width=True)
-                st.markdown(f"Score: {landmark['personalized_score']:.2f}")
+                st.markdown(f"""
+                <div class="recommendation-card">
+                    <h4>{landmark['title']}</h4>
+                    {'<img src="' + landmark['image_url'] + '" class="recommended-image">' if 'image_url' in landmark else ''}
+                    <p>Score: {landmark['personalized_score']:.2f}</p>
+                </div>
+                """, unsafe_allow_html=True)
                 if st.button("👍 Favorite", key=f"fav_{i}_{landmark['title']}"):
                     is_favorite = st.session_state.recommender.toggle_favorite(
                         str(landmark['coordinates'])
