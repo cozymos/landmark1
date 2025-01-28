@@ -65,7 +65,7 @@ with map_col:
     if st.session_state.landmarks:
         add_landmarks_to_map(m, st.session_state.landmarks, show_heatmap)
 
-    # Display map using st_folium
+    # Display map
     map_data = st_folium(
         m,
         width=800,
@@ -80,29 +80,25 @@ with map_col:
         ne = bounds_data.get("_northEast", {})
 
         if sw and ne and "lat" in sw and "lng" in sw and "lat" in ne and "lng" in ne:
-            try:
-                new_bounds = (
-                    float(sw["lat"]),
-                    float(sw["lng"]),
-                    float(ne["lat"]),
-                    float(ne["lng"])
-                )
+            new_bounds = (
+                float(sw["lat"]),
+                float(sw["lng"]),
+                float(ne["lat"]),
+                float(ne["lng"])
+            )
 
-                with st.spinner("Fetching landmarks..."):
-                    landmarks = cache_landmarks(new_bounds)
-                    if landmarks:
-                        st.session_state.landmarks = landmarks
-                        st.session_state.last_bounds = new_bounds
-
-            except Exception as e:
-                st.error(f"Error processing map bounds: {str(e)}")
+            # Update landmarks when bounds change
+            landmarks = cache_landmarks(new_bounds)
+            if landmarks:
+                st.session_state.landmarks = landmarks
+                st.session_state.last_bounds = new_bounds
+                st.rerun()
 
     # Handle clicked location
     if map_data and "last_clicked" in map_data and map_data["last_clicked"]:
         clicked = map_data["last_clicked"]
-        if isinstance(clicked, dict) and "lat" in clicked and "lng" in clicked:
-            if radius_km > 0:
-                draw_distance_circle(m, (clicked["lat"], clicked["lng"]), radius_km)
+        if "lat" in clicked and "lng" in clicked and radius_km > 0:
+            draw_distance_circle(m, (clicked["lat"], clicked["lng"]), radius_km)
 
 with info_col:
     # Filter landmarks based on search and rating
