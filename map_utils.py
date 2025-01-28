@@ -6,11 +6,13 @@ import streamlit as st
 
 def create_base_map() -> folium.Map:
     """Create the base Folium map with plugins"""
+    # Create map with current session state
     m = folium.Map(
         location=st.session_state.map_center,
         zoom_start=st.session_state.zoom_level,
         tiles='OpenStreetMap',
-        control_scale=True
+        control_scale=True,
+        prefer_canvas=True  # Use canvas renderer for better performance
     )
 
     # Add fullscreen button
@@ -36,7 +38,11 @@ def create_marker_cluster() -> plugins.MarkerCluster:
         name='Landmarks',
         overlay=True,
         control=True,
-        icon_create_function=None
+        icon_create_function=None,
+        options={
+            'maxClusterRadius': 50,
+            'disableClusteringAtZoom': 16
+        }
     )
 
 def add_landmarks_to_map(m: folium.Map, landmarks: List[Dict], show_heatmap: bool = False) -> None:
@@ -78,8 +84,8 @@ def add_landmarks_to_map(m: folium.Map, landmarks: List[Dict], show_heatmap: boo
             landmark['relevance'] * 100  # Scale weight for visibility
         ])
 
-    # Add heatmap if there's data
-    if heat_data:
+    # Add heatmap if there's data and it's enabled
+    if heat_data and show_heatmap:
         plugins.HeatMap(
             data=heat_data,
             name='Heatmap',
