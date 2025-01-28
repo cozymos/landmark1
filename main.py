@@ -5,7 +5,6 @@ from wiki_handler import WikiLandmarkFetcher
 from map_utils import create_base_map, draw_distance_circle, add_landmarks_to_map
 from cache_manager import cache_landmarks
 import time
-import json
 
 # Page config
 st.set_page_config(
@@ -14,35 +13,19 @@ st.set_page_config(
     layout="wide"
 )
 
-# Handle map state persistence using session state
-if 'initialized' not in st.session_state:
-    # Get stored values from local storage if they exist
-    st.session_state.initialized = True
-    stored_state = st.session_state.get('stored_map_state', None)
-
-    if stored_state:
-        try:
-            st.session_state.map_center = stored_state.get('map_center', [37.7749, -122.4194])
-            st.session_state.zoom_level = stored_state.get('zoom_level', 12)
-            st.session_state.last_bounds = stored_state.get('last_bounds', None)
-        except Exception:
-            # If there's any error loading stored state, use defaults
-            st.session_state.map_center = [37.7749, -122.4194]
-            st.session_state.zoom_level = 12
-            st.session_state.last_bounds = None
-    else:
-        # Default values for first-time users
-        st.session_state.map_center = [37.7749, -122.4194]
-        st.session_state.zoom_level = 12
-        st.session_state.last_bounds = None
-
-# Initialize other session state variables
+# Initialize session state for map persistence
+if 'last_bounds' not in st.session_state:
+    st.session_state.last_bounds = None
 if 'landmarks' not in st.session_state:
     st.session_state.landmarks = []
 if 'selected_landmark' not in st.session_state:
     st.session_state.selected_landmark = None
 if 'show_heatmap' not in st.session_state:
     st.session_state.show_heatmap = False
+if 'map_center' not in st.session_state:
+    st.session_state.map_center = [37.7749, -122.4194]  # Default to San Francisco
+if 'zoom_level' not in st.session_state:
+    st.session_state.zoom_level = 12
 
 # Title and description
 st.title("🗺️ Local Landmarks Explorer")
@@ -128,13 +111,6 @@ with map_col:
                         st.session_state.last_bounds = new_bounds
                     except Exception as e:
                         st.error(f"Error fetching landmarks: {str(e)}")
-
-        # Store current map state
-        st.session_state.stored_map_state = {
-            'map_center': st.session_state.map_center,
-            'zoom_level': st.session_state.zoom_level,
-            'last_bounds': st.session_state.last_bounds
-        }
 
 with info_col:
     # Filter landmarks based on search and rating
