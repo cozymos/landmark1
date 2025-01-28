@@ -1,6 +1,6 @@
 import streamlit as st
 import folium
-from streamlit_folium import folium_static
+from streamlit_folium import st_folium
 from wiki_handler import WikiLandmarkFetcher
 from map_utils import get_map_bounds, create_base_map
 from cache_manager import cache_landmarks
@@ -41,22 +41,28 @@ m = create_base_map()
 map_col, info_col = st.columns([2, 1])
 
 with map_col:
-    # Display map
-    folium_static(m, width=800)
-    
-    # Get current map bounds
-    bounds = get_map_bounds(m)
-    
-    if bounds != st.session_state.last_bounds:
-        with st.spinner("Fetching landmarks..."):
-            try:
-                # Fetch and cache landmarks
-                landmarks = cache_landmarks(bounds, wiki_fetcher)
-                st.session_state.landmarks = landmarks
-                st.session_state.last_bounds = bounds
-            except Exception as e:
-                st.error(f"Error fetching landmarks: {str(e)}")
-                landmarks = []
+    # Display map using st_folium instead of folium_static
+    map_data = st_folium(m, width=800)
+
+    # Get current map bounds if map_data is available
+    if map_data is not None and 'bounds' in map_data:
+        bounds = (
+            map_data['bounds']['_southWest']['lat'],
+            map_data['bounds']['_southWest']['lng'],
+            map_data['bounds']['_northEast']['lat'],
+            map_data['bounds']['_northEast']['lng']
+        )
+
+        if bounds != st.session_state.last_bounds:
+            with st.spinner("Fetching landmarks..."):
+                try:
+                    # Fetch and cache landmarks
+                    landmarks = cache_landmarks(bounds, wiki_fetcher)
+                    st.session_state.landmarks = landmarks
+                    st.session_state.last_bounds = bounds
+                except Exception as e:
+                    st.error(f"Error fetching landmarks: {str(e)}")
+                    landmarks = []
 
 with info_col:
     # Filter landmarks based on search and rating
@@ -65,9 +71,9 @@ with info_col:
         if (search_term.lower() in l['title'].lower() or not search_term) 
         and l['relevance'] >= min_rating
     ]
-    
+
     st.subheader(f"Found {len(filtered_landmarks)} Landmarks")
-    
+
     # Display landmarks
     for landmark in filtered_landmarks:
         with st.expander(landmark['title']):
