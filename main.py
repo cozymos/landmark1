@@ -27,6 +27,50 @@ if 'map_center' not in st.session_state:
 if 'zoom_level' not in st.session_state:
     st.session_state.zoom_level = 12
 
+# Map state management helper functions
+def update_map_state(map_data: dict) -> None:
+    """Update map state from folium map data"""
+    if not isinstance(map_data, dict):
+        return
+
+    # Handle center updates
+    center = map_data.get("center")
+    if isinstance(center, dict):
+        lat = center.get("lat")
+        lng = center.get("lng")
+        if isinstance(lat, (int, float)) and isinstance(lng, (int, float)):
+            st.session_state.map_center = [float(lat), float(lng)]
+
+    # Handle zoom updates
+    zoom = map_data.get("zoom")
+    if isinstance(zoom, (int, float)):
+        st.session_state.zoom_level = int(zoom)
+
+    # Handle bounds updates
+    bounds = map_data.get("bounds")
+    if isinstance(bounds, dict):
+        sw = bounds.get("_southWest", {})
+        ne = bounds.get("_northEast", {})
+
+        if (isinstance(sw, dict) and isinstance(ne, dict) and
+            all(key in sw and key in ne for key in ["lat", "lng"])):
+
+            new_bounds = (
+                float(sw["lat"]), float(sw["lng"]),
+                float(ne["lat"]), float(ne["lng"])
+            )
+
+            # Only update landmarks if bounds changed significantly
+            if (st.session_state.last_bounds is None or
+                new_bounds != st.session_state.last_bounds):
+                try:
+                    landmarks = cache_landmarks(new_bounds)
+                    if landmarks:
+                        st.session_state.landmarks = landmarks
+                        st.session_state.last_bounds = new_bounds
+                except Exception as e:
+                    st.error(f"Error fetching landmarks: {str(e)}")
+
 # Title and description
 st.title("🗺️ Local Landmarks Explorer")
 st.markdown("""
@@ -78,51 +122,11 @@ with map_col:
             width=800,
             height=600,
             key="landmark_explorer",
-            returned_objects=["bounds", "center", "zoom"]  # Include center for pan operations
+            returned_objects=["bounds", "center", "zoom"]
         )
 
-        # Handle map state updates
-        if isinstance(map_data, dict):
-            # Update center if changed
-            center_data = map_data.get("center")
-            if isinstance(center_data, dict):
-                lat = center_data.get("lat")
-                lng = center_data.get("lng")
-                if lat is not None and lng is not None:
-                    st.session_state.map_center = [float(lat), float(lng)]
-
-            # Update zoom level if changed
-            zoom = map_data.get("zoom")
-            if zoom is not None:
-                st.session_state.zoom_level = zoom
-
-            # Handle bounds updates if available
-            bounds = map_data.get("bounds")
-            if isinstance(bounds, dict):
-                sw = bounds.get("_southWest", {})
-                ne = bounds.get("_northEast", {})
-
-                if (isinstance(sw, dict) and isinstance(ne, dict) and
-                    "lat" in sw and "lng" in sw and
-                    "lat" in ne and "lng" in ne):
-
-                    new_bounds = (
-                        float(sw["lat"]),
-                        float(sw["lng"]),
-                        float(ne["lat"]),
-                        float(ne["lng"])
-                    )
-
-                    # Update landmarks if bounds changed significantly
-                    if (st.session_state.last_bounds is None or
-                        new_bounds != st.session_state.last_bounds):
-                        try:
-                            landmarks = cache_landmarks(new_bounds)
-                            if landmarks:
-                                st.session_state.landmarks = landmarks
-                                st.session_state.last_bounds = new_bounds
-                        except Exception as e:
-                            st.error(f"Error fetching landmarks: {str(e)}")
+        # Update map state if data is available
+        update_map_state(map_data)
 
     except Exception as e:
         st.error(f"Error rendering map: {str(e)}")
