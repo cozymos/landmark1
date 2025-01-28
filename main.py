@@ -72,16 +72,30 @@ with map_col:
         if radius_km > 0:
             draw_distance_circle(m, tuple(st.session_state.map_center), radius_km)
 
-        # Display map with stable key and minimal returned objects
+        # Display map with stable key and include center in returned objects
         map_data = st_folium(
             m,
             width=800,
             height=600,
             key="landmark_explorer",
-            returned_objects=["last_active_drawing", "all_drawings", "bounds", "zoom"]
+            returned_objects=["bounds", "center", "zoom"]  # Include center for pan operations
         )
 
+        # Handle map state updates
         if isinstance(map_data, dict):
+            # Update center if changed
+            center_data = map_data.get("center")
+            if isinstance(center_data, dict):
+                lat = center_data.get("lat")
+                lng = center_data.get("lng")
+                if lat is not None and lng is not None:
+                    st.session_state.map_center = [float(lat), float(lng)]
+
+            # Update zoom level if changed
+            zoom = map_data.get("zoom")
+            if zoom is not None:
+                st.session_state.zoom_level = zoom
+
             # Handle bounds updates if available
             bounds = map_data.get("bounds")
             if isinstance(bounds, dict):
@@ -110,10 +124,6 @@ with map_col:
                         except Exception as e:
                             st.error(f"Error fetching landmarks: {str(e)}")
 
-            # Update zoom level if available
-            if "zoom" in map_data:
-                st.session_state.zoom_level = map_data["zoom"]
-
     except Exception as e:
         st.error(f"Error rendering map: {str(e)}")
 
@@ -139,15 +149,6 @@ with info_col:
                 <a href='{landmark['url']}' target='_blank'>Read more on Wikipedia</a>
             </div>
             """, unsafe_allow_html=True)
-
-            # Add buttons for interaction
-            col1, col2 = st.columns(2)
-            with col1:
-                if st.button(f"Show Distance Circle ({landmark['title']})", key=f"circle_{landmark['title']}"):
-                    draw_distance_circle(m, landmark['coordinates'], radius_km if radius_km > 0 else 1.0)
-            with col2:
-                if st.button(f"Center Map ({landmark['title']})", key=f"center_{landmark['title']}"):
-                    st.session_state.map_center = list(landmark['coordinates'])
 
 # Footer
 st.markdown("---")
