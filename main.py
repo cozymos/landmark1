@@ -63,7 +63,7 @@ with map_col:
 
     # Add current landmarks to map if available
     if st.session_state.landmarks:
-        add_landmarks_to_map(m, st.session_state.landmarks, st.session_state.show_heatmap)
+        add_landmarks_to_map(m, st.session_state.landmarks, show_heatmap)
 
     # Display map using st_folium
     map_data = st_folium(
@@ -79,8 +79,7 @@ with map_col:
         sw = bounds_data.get("_southWest", {})
         ne = bounds_data.get("_northEast", {})
 
-        if (isinstance(sw, dict) and isinstance(ne, dict) and
-            "lat" in sw and "lng" in sw and "lat" in ne and "lng" in ne):
+        if sw and ne and "lat" in sw and "lng" in sw and "lat" in ne and "lng" in ne:
             try:
                 new_bounds = (
                     float(sw["lat"]),
@@ -89,13 +88,11 @@ with map_col:
                     float(ne["lng"])
                 )
 
-                # Only fetch new landmarks if bounds have changed
-                if new_bounds != st.session_state.last_bounds:
-                    with st.spinner("Fetching landmarks..."):
-                        landmarks = cache_landmarks(new_bounds)
-                        if landmarks:
-                            st.session_state.landmarks = landmarks
-                            st.session_state.last_bounds = new_bounds
+                with st.spinner("Fetching landmarks..."):
+                    landmarks = cache_landmarks(new_bounds)
+                    if landmarks:
+                        st.session_state.landmarks = landmarks
+                        st.session_state.last_bounds = new_bounds
 
             except Exception as e:
                 st.error(f"Error processing map bounds: {str(e)}")
