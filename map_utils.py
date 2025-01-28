@@ -40,15 +40,11 @@ def create_marker_cluster() -> plugins.MarkerCluster:
 
 def add_landmarks_to_map(m: folium.Map, landmarks: List[Dict], show_heatmap: bool = False) -> None:
     """Add landmark markers to the map with clustering and optional heatmap"""
-    # Create feature groups for better layer control
-    marker_group = folium.FeatureGroup(name="Landmarks", show=True)
-    heat_group = folium.FeatureGroup(name="Heatmap", show=show_heatmap)
-
-    # Create marker cluster and add to marker group
+    # Create marker cluster
     marker_cluster = create_marker_cluster()
-    marker_cluster.add_to(marker_group)
+    marker_cluster.add_to(m)
 
-    # Create heatmap data
+    # Prepare heatmap data
     heat_data = []
 
     for landmark in landmarks:
@@ -72,40 +68,39 @@ def add_landmarks_to_map(m: folium.Map, landmarks: List[Dict], show_heatmap: boo
             popup=folium.Popup(popup_html, max_width=300),
             icon=folium.Icon(color=color, icon='info-sign'),
         )
-
-        # Add marker to cluster
         marker.add_to(marker_cluster)
 
-        # Add coordinates to heatmap data
+        # Add to heatmap data with scaled weight
         heat_data.append([
-            landmark['coordinates'][0],  # latitude
-            landmark['coordinates'][1],  # longitude
-            landmark['relevance'] * 100  # weight (scaled up for better visibility)
+            landmark['coordinates'][0],
+            landmark['coordinates'][1],
+            landmark['relevance'] * 1000  # Scale up the weight significantly
         ])
 
-    # Add marker group to map
-    marker_group.add_to(m)
-
-    # Create and add heatmap if enabled
+    # Create heatmap layer
     if heat_data:
         heatmap = plugins.HeatMap(
             data=heat_data,
-            name='Heat Map',
-            min_opacity=0.3,
+            name='Heatmap',
+            min_opacity=0.5,
             max_zoom=18,
-            radius=25,
-            blur=15,
+            radius=15,
+            blur=10,
+            max_val=1000,  # Match the scaled weight
             gradient={
-                0.4: 'blue',
-                0.6: 'lime',
-                0.8: 'orange',
-                1.0: 'red'
+                0.4: '#1E90FF',  # Bright blue
+                0.6: '#32CD32',  # Lime green
+                0.8: '#FFA500',  # Orange
+                1.0: '#FF0000'   # Red
             }
         )
-        heatmap.add_to(heat_group)
-        heat_group.add_to(m)
 
-    # Add layer control
+        # Create a separate feature group for the heatmap
+        heatmap_group = folium.FeatureGroup(name='Heatmap', show=show_heatmap)
+        heatmap.add_to(heatmap_group)
+        heatmap_group.add_to(m)
+
+    # Add layer control last
     folium.LayerControl().add_to(m)
 
 def draw_distance_circle(m: folium.Map, center: Tuple[float, float], radius_km: float):
