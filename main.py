@@ -37,9 +37,7 @@ st.sidebar.header("Map Controls")
 
 # Layer toggles
 show_heatmap = st.sidebar.checkbox("Show Heatmap", value=st.session_state.show_heatmap)
-if show_heatmap != st.session_state.show_heatmap:
-    st.session_state.show_heatmap = show_heatmap
-    st.rerun()
+st.session_state.show_heatmap = show_heatmap  # Update state without forcing refresh
 
 # Filters
 st.sidebar.header("Filters")
@@ -105,13 +103,13 @@ with map_col:
                     float(ne["lng"])
                 )
 
-                # Only fetch new landmarks if bounds changed
+                # Only fetch new landmarks if bounds changed significantly
                 if bounds != st.session_state.last_bounds:
                     with st.spinner("Fetching landmarks..."):
                         landmarks = cache_landmarks(bounds)
                         st.session_state.landmarks = landmarks
                         st.session_state.last_bounds = bounds
-                        st.rerun()
+                        st.rerun()  # Only rerun when bounds actually change
 
     # Handle clicked location
     if (map_data and 
@@ -140,7 +138,7 @@ with info_col:
 
     st.subheader(f"Found {len(filtered_landmarks)} Landmarks")
 
-    # Display landmarks with enhanced cards
+    # Display landmarks
     for landmark in filtered_landmarks:
         with st.expander(landmark['title']):
             st.markdown(f"""
