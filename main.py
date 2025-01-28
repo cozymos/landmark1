@@ -60,8 +60,10 @@ def update_map_state(map_data: dict) -> None:
         ne = bounds.get("_northEast", {})
 
         try:
+            # Validate that all required values exist and are not None
             if (isinstance(sw, dict) and isinstance(ne, dict) and
-                all(k in sw and k in ne for k in ["lat", "lng"])):
+                sw.get("lat") is not None and sw.get("lng") is not None and
+                ne.get("lat") is not None and ne.get("lng") is not None):
 
                 new_bounds = (
                     float(sw["lat"]), float(sw["lng"]),
@@ -82,7 +84,8 @@ def update_map_state(map_data: dict) -> None:
                             st.session_state.last_bounds = new_bounds
 
         except (ValueError, TypeError) as e:
-            st.error(f"Error updating map bounds: {str(e)}")
+            # Silently handle the error to prevent disrupting the user experience
+            pass
 
 # Title and description
 st.title("🗺️ Local Landmarks Explorer")
