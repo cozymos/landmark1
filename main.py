@@ -73,44 +73,72 @@ with map_col:
         returned_objects=["bounds", "last_clicked"]
     )
 
-    # Get current map bounds if map_data is available
-    if map_data is not None and "bounds" in map_data:
-        bounds_data = map_data["bounds"]
-        if bounds_data and "_southWest" in bounds_data and "_northEast" in bounds_data:
-            sw = bounds_data["_southWest"]
-            ne = bounds_data["_northEast"]
+    try:
+        # Get current map bounds if map_data is available
+        if (map_data and 
+            isinstance(map_data, dict) and 
+            "bounds" in map_data and 
+            map_data["bounds"]):
 
-            if sw and ne and "lat" in sw and "lng" in sw and "lat" in ne and "lng" in ne:
-                bounds = (
-                    float(sw["lat"]),
-                    float(sw["lng"]),
-                    float(ne["lat"]),
-                    float(ne["lng"])
-                )
+            bounds_data = map_data["bounds"]
+            if (isinstance(bounds_data, dict) and 
+                "_southWest" in bounds_data and 
+                "_northEast" in bounds_data):
 
-                if bounds != st.session_state.last_bounds:
-                    with st.spinner("Fetching landmarks..."):
-                        try:
-                            landmarks = cache_landmarks(bounds)
-                            st.session_state.landmarks = landmarks
-                            st.session_state.last_bounds = bounds
+                sw = bounds_data["_southWest"]
+                ne = bounds_data["_northEast"]
 
-                            # Add landmarks to map with heatmap based on toggle
-                            add_landmarks_to_map(m, landmarks, show_heatmap=show_heatmap)
-                        except Exception as e:
-                            st.error(f"Error fetching landmarks: {str(e)}")
-                            st.session_state.landmarks = []
+                if (sw and ne and 
+                    isinstance(sw, dict) and isinstance(ne, dict) and
+                    all(key in sw for key in ["lat", "lng"]) and 
+                    all(key in ne for key in ["lat", "lng"]) and
+                    all(isinstance(sw[key], (int, float)) for key in ["lat", "lng"]) and
+                    all(isinstance(ne[key], (int, float)) for key in ["lat", "lng"])):
+
+                    bounds = (
+                        float(sw["lat"]),
+                        float(sw["lng"]),
+                        float(ne["lat"]),
+                        float(ne["lng"])
+                    )
+
+                    if bounds != st.session_state.last_bounds:
+                        with st.spinner("Fetching landmarks..."):
+                            try:
+                                landmarks = cache_landmarks(bounds)
+                                st.session_state.landmarks = landmarks
+                                st.session_state.last_bounds = bounds
+
+                                # Add landmarks to map with heatmap based on toggle
+                                add_landmarks_to_map(m, landmarks, show_heatmap=show_heatmap)
+                            except Exception as e:
+                                st.error(f"Error fetching landmarks: {str(e)}")
+                                st.session_state.landmarks = []
+    except Exception as e:
+        st.error(f"Error processing map data: {str(e)}")
 
     # Handle clicked location
-    if map_data is not None and "last_clicked" in map_data:
-        clicked_data = map_data["last_clicked"]
-        if clicked_data and "lat" in clicked_data and "lng" in clicked_data:
-            clicked_lat = clicked_data["lat"]
-            clicked_lon = clicked_data["lng"]
+    try:
+        if (map_data and 
+            isinstance(map_data, dict) and 
+            "last_clicked" in map_data and 
+            map_data["last_clicked"]):
 
-            # Draw distance circle if radius is set
-            if radius_km > 0:
-                draw_distance_circle(m, (clicked_lat, clicked_lon), radius_km)
+            clicked_data = map_data["last_clicked"]
+            if (isinstance(clicked_data, dict) and 
+                "lat" in clicked_data and 
+                "lng" in clicked_data and
+                isinstance(clicked_data["lat"], (int, float)) and
+                isinstance(clicked_data["lng"], (int, float))):
+
+                clicked_lat = clicked_data["lat"]
+                clicked_lon = clicked_data["lng"]
+
+                # Draw distance circle if radius is set
+                if radius_km > 0:
+                    draw_distance_circle(m, (clicked_lat, clicked_lon), radius_km)
+    except Exception as e:
+        st.error(f"Error handling clicked location: {str(e)}")
 
 with info_col:
     # Filter landmarks based on search and rating
