@@ -15,13 +15,10 @@ st.set_page_config(
     layout="wide"
 )
 
-# Get URL parameters for state persistence
-query_params = st.experimental_get_query_params()
-
 # Initialize session state with URL parameters if available
 if 'map_center' not in st.session_state:
     try:
-        center_str = query_params.get('center', ['37.7749,-122.4194'])[0]
+        center_str = st.query_params.get('center', '37.7749,-122.4194')
         lat, lon = map(float, center_str.split(','))
         st.session_state.map_center = [lat, lon]
     except:
@@ -29,7 +26,7 @@ if 'map_center' not in st.session_state:
 
 if 'zoom_level' not in st.session_state:
     try:
-        st.session_state.zoom_level = int(query_params.get('zoom', ['12'])[0])
+        st.session_state.zoom_level = int(st.query_params.get('zoom', '12'))
     except:
         st.session_state.zoom_level = 12
 
@@ -71,10 +68,8 @@ if st.sidebar.button("Go to Location"):
     st.session_state.map_center = [custom_lat, custom_lon]
     st.session_state.zoom_level = 12
     # Update URL parameters
-    st.experimental_set_query_params(
-        center=f"{custom_lat},{custom_lon}",
-        zoom=str(st.session_state.zoom_level)
-    )
+    st.query_params['center'] = f"{custom_lat},{custom_lon}"
+    st.query_params['zoom'] = str(st.session_state.zoom_level)
 
 # Main map container
 map_col, info_col = st.columns([2, 1])
@@ -111,20 +106,16 @@ with map_col:
                 if lat is not None and lng is not None:
                     st.session_state.map_center = [float(lat), float(lng)]
                     # Update URL parameters
-                    st.experimental_set_query_params(
-                        center=f"{lat},{lng}",
-                        zoom=str(st.session_state.zoom_level)
-                    )
+                    st.query_params['center'] = f"{lat},{lng}"
+                    st.query_params['zoom'] = str(st.session_state.zoom_level)
 
             # Update zoom level if changed
             zoom = map_data.get("zoom")
             if zoom is not None:
                 st.session_state.zoom_level = zoom
                 # Update URL parameters
-                st.experimental_set_query_params(
-                    center=f"{st.session_state.map_center[0]},{st.session_state.map_center[1]}",
-                    zoom=str(zoom)
-                )
+                st.query_params['center'] = f"{st.session_state.map_center[0]},{st.session_state.map_center[1]}"
+                st.query_params['zoom'] = str(zoom)
 
             # Handle bounds updates if available
             bounds = map_data.get("bounds")
