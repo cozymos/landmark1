@@ -96,23 +96,32 @@ with map_col:
             returned_objects=["bounds", "center", "zoom"]
         )
 
+        # Map data handling functions
+        def safe_float(value, default=0.0):
+            """Safely convert value to float with fallback"""
+            try:
+                if value is not None:
+                    return float(value)
+                return default
+            except (ValueError, TypeError):
+                return default
+
         # Handle map state updates
         if isinstance(map_data, dict):
             # Update center if changed
             center_data = map_data.get("center")
             if isinstance(center_data, dict):
-                lat = center_data.get("lat")
-                lng = center_data.get("lng")
-                if lat is not None and lng is not None:
-                    st.session_state.map_center = [float(lat), float(lng)]
-                    # Update URL parameters
-                    st.query_params['center'] = f"{lat},{lng}"
-                    st.query_params['zoom'] = str(st.session_state.zoom_level)
+                lat = safe_float(center_data.get("lat"), st.session_state.map_center[0])
+                lng = safe_float(center_data.get("lng"), st.session_state.map_center[1])
+                st.session_state.map_center = [lat, lng]
+                # Update URL parameters
+                st.query_params['center'] = f"{lat},{lng}"
+                st.query_params['zoom'] = str(st.session_state.zoom_level)
 
             # Update zoom level if changed
             zoom = map_data.get("zoom")
             if zoom is not None:
-                st.session_state.zoom_level = zoom
+                st.session_state.zoom_level = int(zoom)
                 # Update URL parameters
                 st.query_params['center'] = f"{st.session_state.map_center[0]},{st.session_state.map_center[1]}"
                 st.query_params['zoom'] = str(zoom)
@@ -123,27 +132,27 @@ with map_col:
                 sw = bounds.get("_southWest", {})
                 ne = bounds.get("_northEast", {})
 
-                if (isinstance(sw, dict) and isinstance(ne, dict) and
-                    "lat" in sw and "lng" in sw and
-                    "lat" in ne and "lng" in ne):
-
+                if (isinstance(sw, dict) and isinstance(ne, dict)):
                     new_bounds = (
-                        float(sw["lat"]),
-                        float(sw["lng"]),
-                        float(ne["lat"]),
-                        float(ne["lng"])
+                        safe_float(sw.get("lat")),
+                        safe_float(sw.get("lng")),
+                        safe_float(ne.get("lat")),
+                        safe_float(ne.get("lng"))
                     )
 
-                    # Update landmarks if bounds changed significantly
-                    if (st.session_state.last_bounds is None or
-                        new_bounds != st.session_state.last_bounds):
-                        try:
-                            landmarks = get_cached_landmarks(new_bounds, st.session_state.zoom_level)
-                            if landmarks:
-                                st.session_state.landmarks = landmarks
-                                st.session_state.last_bounds = new_bounds
-                        except Exception as e:
-                            st.error(f"Error fetching landmarks: {str(e)}")
+                    # Only update if we have valid bounds
+                    if all(isinstance(x, float) for x in new_bounds):
+                        # Update landmarks if bounds changed significantly
+                        if (st.session_state.last_bounds is None or
+                            new_bounds != st.session_state.last_bounds):
+                            try:
+                                from cache_manager import get_cached_landmarks
+                                landmarks = get_cached_landmarks(new_bounds, st.session_state.zoom_level)
+                                if landmarks:
+                                    st.session_state.landmarks = landmarks
+                                    st.session_state.last_bounds = new_bounds
+                            except Exception as e:
+                                st.error(f"Error fetching landmarks: {str(e)}")
 
     except Exception as e:
         st.error(f"Error rendering map: {str(e)}")
