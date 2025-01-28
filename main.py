@@ -3,10 +3,12 @@ import folium
 from streamlit_folium import st_folium
 from wiki_handler import WikiLandmarkFetcher
 from map_utils import create_base_map, draw_distance_circle, add_landmarks_to_map
-from cache_manager import cache_landmarks #Presume this is still needed for fallback or other uses.
+from cache_manager import cache_landmarks
 import time
 from urllib.parse import quote, unquote
 import json
+from journey_tracker import JourneyTracker
+import hashlib
 
 # Page config
 st.set_page_config(
@@ -38,6 +40,8 @@ if 'selected_landmark' not in st.session_state:
     st.session_state.selected_landmark = None
 if 'show_heatmap' not in st.session_state:
     st.session_state.show_heatmap = False
+if 'journey_tracker' not in st.session_state:
+    st.session_state.journey_tracker = JourneyTracker()
 
 # Title and description
 st.title("🗺️ Local Landmarks Explorer")
@@ -70,6 +74,33 @@ if st.sidebar.button("Go to Location"):
     # Update URL parameters
     st.query_params['center'] = f"{custom_lat},{custom_lon}"
     st.query_params['zoom'] = str(st.session_state.zoom_level)
+
+st.sidebar.markdown("---")
+st.sidebar.header("🗺️ Journey Progress")
+
+# Get current progress
+progress = st.session_state.journey_tracker.get_progress()
+total_discovered = progress["total_discovered"]
+
+# Show progress metrics
+st.sidebar.metric("Landmarks Discovered", total_discovered)
+
+# Show achievements
+if progress["achievements"]:
+    st.sidebar.subheader("🏆 Achievements")
+    for achievement in progress["achievements"]:
+        st.sidebar.markdown(f"{achievement.icon} **{achievement.name}**")
+        st.sidebar.caption(achievement.description)
+
+# Show next achievement
+if progress["next_achievement"]:
+    next_achievement = progress["next_achievement"]
+    st.sidebar.markdown("---")
+    st.sidebar.subheader("🎯 Next Achievement")
+    st.sidebar.markdown(f"{next_achievement.icon} **{next_achievement.name}**")
+    st.sidebar.caption(next_achievement.description)
+    st.sidebar.progress(min(total_discovered / next_achievement.requirement, 1.0))
+
 
 # Main map container
 map_col, info_col = st.columns([2, 1])
@@ -167,9 +198,28 @@ with info_col:
 
     st.subheader(f"Found {len(filtered_landmarks)} Landmarks")
 
+    # Display landmarks with discovery tracking
+    def process_landmark_discovery(landmark):
+        """Process landmark discovery and handle animations"""
+        # Create unique ID for landmark
+        landmark_id = hashlib.md5(f"{landmark['title']}:{landmark['coordinates']}".encode()).hexdigest()
+
+        # Check if this is a new discovery
+        discovery_info = st.session_state.journey_tracker.add_discovery(landmark_id, landmark['title'])
+
+        if discovery_info["is_new"]:
+            # Show discovery animation
+            st.balloons()
+
+            # Show achievement notifications
+            for achievement in discovery_info.get("new_achievements", []):
+                st.success(f"🎉 Achievement Unlocked: {achievement.icon} {achievement.name}")
+                st.toast(f"New Achievement: {achievement.name}")
+
     # Display landmarks
     for landmark in filtered_landmarks:
         with st.expander(landmark['title']):
+            process_landmark_discovery(landmark)
             st.markdown(f"""
             <div style='background-color: #f0f2f6; padding: 1rem; border-radius: 0.5rem;'>
                 <h3 style='margin-top: 0;'>{landmark['title']}</h3>
@@ -192,6 +242,6 @@ Data sourced from Wikipedia. Updates automatically as you explore the map.
 def get_cached_landmarks(bounds, zoom_level):
     # Placeholder - Replace with actual caching logic using bounds and zoom level
     try:
-        return cache_landmarks(bounds) #Fallback to original if new caching fails.
+        return cache_landmarks(bounds)
     except:
         return []
