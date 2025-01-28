@@ -2,12 +2,13 @@ import folium
 from folium import plugins
 from typing import Tuple, List, Dict
 import branca.colormap as cm
+import streamlit as st
 
 def create_base_map() -> folium.Map:
     """Create the base Folium map with plugins"""
     m = folium.Map(
-        location=[37.7749, -122.4194],  # Default to San Francisco
-        zoom_start=12,
+        location=st.session_state.map_center,
+        zoom_start=st.session_state.zoom_level,
         tiles='OpenStreetMap',
         control_scale=True
     )

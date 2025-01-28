@@ -59,27 +59,28 @@ map_col, info_col = st.columns([2, 1])
 
 with map_col:
     # Create base map with current state
-    m = folium.Map(
-        location=st.session_state.map_center,
-        zoom_start=st.session_state.zoom_level,
-        tiles='OpenStreetMap',
-        control_scale=True
-    )
+    m = create_base_map()  # Use the utility function that's already defined
 
     # Add current landmarks to map if available
     if st.session_state.landmarks:
         add_landmarks_to_map(m, st.session_state.landmarks, show_heatmap)
 
-    # Display map and get state
+    # Add distance circle if radius is set
+    if radius_km > 0:
+        draw_distance_circle(m, st.session_state.map_center, radius_km)
+
+    # Display map with all current state
     map_data = st_folium(
         m,
+        key="main_map",  # Add a stable key to maintain state
         width=800,
         height=600,
-        returned_objects=["bounds", "center", "zoom"]
+        returned_objects=["bounds", "center", "zoom"],
     )
 
     # Update map state if data is available
     if map_data:
+        # Update center and zoom if available
         if "center" in map_data and map_data["center"]:
             st.session_state.map_center = [
                 map_data["center"]["lat"],
