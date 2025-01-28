@@ -10,6 +10,7 @@ import json
 from journey_tracker import JourneyTracker
 import hashlib
 import os
+from recommender import LandmarkRecommender
 
 # Page config
 st.set_page_config(
@@ -47,6 +48,8 @@ if 'show_heatmap' not in st.session_state:
     st.session_state.show_heatmap = False
 if 'journey_tracker' not in st.session_state:
     st.session_state.journey_tracker = JourneyTracker()
+if 'recommender' not in st.session_state:
+    st.session_state.recommender = LandmarkRecommender()
 
 # Title and description
 st.title("🗺️ Local Landmarks Explorer")
@@ -54,6 +57,32 @@ st.markdown("""
 Explore landmarks in your area with information from Google Places. 
 Pan and zoom the map to discover new locations!
 """)
+
+# Recommendations section
+st.markdown("### 🎯 Recommended Landmarks")
+if st.session_state.landmarks:
+    recommendations = st.session_state.recommender.get_recommendations(
+        st.session_state.landmarks,
+        st.session_state.map_center
+    )
+
+    if recommendations:
+        rec_cols = st.columns(len(recommendations))
+        for i, landmark in enumerate(recommendations):
+            with rec_cols[i]:
+                st.markdown(f"**{landmark['title']}**")
+                if 'image_url' in landmark:
+                    st.image(landmark['image_url'], use_container_width=True)
+                st.markdown(f"Score: {landmark['personalized_score']:.2f}")
+                if st.button("👍 Favorite", key=f"fav_{i}_{landmark['title']}"):
+                    is_favorite = st.session_state.recommender.toggle_favorite(
+                        str(landmark['coordinates'])
+                    )
+                    if is_favorite:
+                        st.success("Added to favorites!")
+                    else:
+                        st.info("Removed from favorites")
+
 
 # Sidebar controls
 st.sidebar.header("Map Controls")
@@ -225,6 +254,12 @@ with info_col:
     for landmark in filtered_landmarks:
         with st.expander(landmark['title']):
             process_landmark_discovery(landmark)
+
+            # Record interaction with landmark
+            st.session_state.recommender.record_interaction(
+                str(landmark['coordinates']),
+                landmark.get('type', 'landmark')
+            )
 
             # Display the landmark image if available
             if 'image_url' in landmark:
