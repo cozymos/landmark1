@@ -3,7 +3,7 @@ import folium
 from streamlit_folium import st_folium
 from wiki_handler import WikiLandmarkFetcher
 from map_utils import create_base_map, draw_distance_circle, add_landmarks_to_map
-from cache_manager import cache_landmarks
+from cache_manager import cache_landmarks #Presume this is still needed for fallback or other uses.
 import time
 from urllib.parse import quote, unquote
 import json
@@ -138,7 +138,7 @@ with map_col:
                     if (st.session_state.last_bounds is None or
                         new_bounds != st.session_state.last_bounds):
                         try:
-                            landmarks = cache_landmarks(new_bounds)
+                            landmarks = get_cached_landmarks(new_bounds, st.session_state.zoom_level)
                             if landmarks:
                                 st.session_state.landmarks = landmarks
                                 st.session_state.last_bounds = new_bounds
@@ -179,3 +179,10 @@ Data sourced from Wikipedia. Updates automatically as you explore the map.
 * 🟠 Orange markers: Medium relevance landmarks
 * 🔵 Blue markers: Lower relevance landmarks
 """)
+
+def get_cached_landmarks(bounds, zoom_level):
+    # Placeholder - Replace with actual caching logic using bounds and zoom level
+    try:
+        return cache_landmarks(bounds) #Fallback to original if new caching fails.
+    except:
+        return []
