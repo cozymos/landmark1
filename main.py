@@ -24,6 +24,8 @@ if 'show_heatmap' not in st.session_state:
     st.session_state.show_heatmap = False
 if 'map_center' not in st.session_state:
     st.session_state.map_center = [37.7749, -122.4194]  # Default to San Francisco
+if 'zoom_level' not in st.session_state:
+    st.session_state.zoom_level = 12
 
 # Title and description
 st.title("🗺️ Local Landmarks Explorer")
@@ -56,10 +58,10 @@ if st.sidebar.button("Go to Location"):
 map_col, info_col = st.columns([2, 1])
 
 with map_col:
-    # Create base map centered at current location
+    # Create base map with current state
     m = folium.Map(
         location=st.session_state.map_center,
-        zoom_start=12,
+        zoom_start=st.session_state.zoom_level,
         tiles='OpenStreetMap',
         control_scale=True
     )
@@ -68,46 +70,46 @@ with map_col:
     if st.session_state.landmarks:
         add_landmarks_to_map(m, st.session_state.landmarks, show_heatmap)
 
-    # Display map
+    # Display map and get state
     map_data = st_folium(
         m,
         width=800,
         height=600,
-        returned_objects=["bounds", "center", "zoom", "last_clicked"]
+        returned_objects=["bounds", "center", "zoom"]
     )
 
-    # Update map center if changed
-    if map_data and "center" in map_data and map_data["center"]:
-        st.session_state.map_center = [map_data["center"]["lat"], map_data["center"]["lng"]]
+    # Update map state if data is available
+    if map_data:
+        if "center" in map_data and map_data["center"]:
+            st.session_state.map_center = [
+                map_data["center"]["lat"],
+                map_data["center"]["lng"]
+            ]
+        if "zoom" in map_data and map_data["zoom"]:
+            st.session_state.zoom_level = map_data["zoom"]
 
-    # Process map bounds
-    if map_data and "bounds" in map_data and map_data["bounds"]:
-        bounds_data = map_data["bounds"]
-        sw = bounds_data.get("_southWest", {})
-        ne = bounds_data.get("_northEast", {})
+        # Process bounds for landmarks
+        if "bounds" in map_data and map_data["bounds"]:
+            bounds_data = map_data["bounds"]
+            sw = bounds_data.get("_southWest", {})
+            ne = bounds_data.get("_northEast", {})
 
-        if sw and ne and all(key in sw and key in ne for key in ["lat", "lng"]):
-            new_bounds = (
-                float(sw["lat"]),
-                float(sw["lng"]),
-                float(ne["lat"]),
-                float(ne["lng"])
-            )
+            if sw and ne and all(key in sw and key in ne for key in ["lat", "lng"]):
+                new_bounds = (
+                    float(sw["lat"]),
+                    float(sw["lng"]),
+                    float(ne["lat"]),
+                    float(ne["lng"])
+                )
 
-            # Only fetch new landmarks if bounds have changed
-            if new_bounds != st.session_state.last_bounds:
-                try:
-                    landmarks = cache_landmarks(new_bounds)
-                    st.session_state.landmarks = landmarks
-                    st.session_state.last_bounds = new_bounds
-                except Exception as e:
-                    st.error(f"Error fetching landmarks: {str(e)}")
-
-    # Handle clicked location for distance circle
-    if map_data and "last_clicked" in map_data and map_data["last_clicked"]:
-        clicked = map_data["last_clicked"]
-        if "lat" in clicked and "lng" in clicked and radius_km > 0:
-            draw_distance_circle(m, (clicked["lat"], clicked["lng"]), radius_km)
+                # Only fetch new landmarks if bounds have changed
+                if new_bounds != st.session_state.last_bounds:
+                    try:
+                        landmarks = cache_landmarks(new_bounds)
+                        st.session_state.landmarks = landmarks
+                        st.session_state.last_bounds = new_bounds
+                    except Exception as e:
+                        st.error(f"Error fetching landmarks: {str(e)}")
 
 with info_col:
     # Filter landmarks based on search and rating
