@@ -39,7 +39,7 @@ def create_marker_cluster() -> plugins.MarkerCluster:
     )
 
 def add_landmarks_to_map(m: folium.Map, landmarks: List[Dict], show_heatmap: bool = False) -> None:
-    """Add landmark markers to the map with clustering"""
+    """Add landmark markers to the map with clustering and optional heatmap"""
     # Create marker cluster
     marker_cluster = create_marker_cluster()
 
@@ -72,29 +72,35 @@ def add_landmarks_to_map(m: folium.Map, landmarks: List[Dict], show_heatmap: boo
         marker.add_to(marker_cluster)
 
         # Add coordinates to heatmap data with weight based on relevance
-        heat_data.append([
-            landmark['coordinates'][0],
-            landmark['coordinates'][1],
-            landmark['relevance']
-        ])
+        if show_heatmap:
+            heat_data.append([
+                landmark['coordinates'][0],  # latitude
+                landmark['coordinates'][1],  # longitude
+                landmark['relevance']  # weight
+            ])
 
     # Add marker cluster to map
     marker_cluster.add_to(m)
 
-    # Add heatmap layer if enabled
+    # Add heatmap layer if enabled and there's data
     if show_heatmap and heat_data:
-        plugins.HeatMap(
-            heat_data,
+        heatmap = plugins.HeatMap(
+            data=heat_data,
             name='Landmark Density',
             min_opacity=0.3,
             max_zoom=18,
-            radius=25,
-            blur=15,
-            overlay=True,
-            control=True
-        ).add_to(m)
+            radius=15,
+            blur=10,
+            gradient={
+                0.4: 'blue',
+                0.6: 'yellow',
+                0.8: 'orange',
+                1.0: 'red'
+            }
+        )
+        heatmap.add_to(m)
 
-    # Add layer control
+    # Add layer control to toggle between markers and heatmap
     folium.LayerControl().add_to(m)
 
 def draw_distance_circle(m: folium.Map, center: Tuple[float, float], radius_km: float):
