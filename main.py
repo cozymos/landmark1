@@ -222,7 +222,7 @@ with info_col:
 
             # Display the landmark image if available
             if 'image_url' in landmark:
-                st.image(landmark['image_url'], caption=landmark['title'], use_column_width=True)
+                st.image(landmark['image_url'], caption=landmark['title'], use_container_width=True)
 
             st.markdown(f"""
             <div style='background-color: #f0f2f6; padding: 1rem; border-radius: 0.5rem;'>
