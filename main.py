@@ -25,6 +25,15 @@ if 'show_heatmap' not in st.session_state:
 if 'map_center' not in st.session_state:
     st.session_state.map_center = [37.7749, -122.4194]
 
+# Create base map function to ensure consistent map creation
+def create_map():
+    return folium.Map(
+        location=st.session_state.map_center,
+        zoom_start=12,
+        tiles='OpenStreetMap',
+        control_scale=True
+    )
+
 # Title and description
 st.title("🗺️ Local Landmarks Explorer")
 st.markdown("""
@@ -35,9 +44,12 @@ Pan and zoom the map to discover new locations!
 # Sidebar controls
 st.sidebar.header("Map Controls")
 
-# Layer toggles
+# Layer toggles with improved state management
 show_heatmap = st.sidebar.checkbox("Show Heatmap", value=st.session_state.show_heatmap)
-st.session_state.show_heatmap = show_heatmap
+if show_heatmap != st.session_state.show_heatmap:
+    st.session_state.show_heatmap = show_heatmap
+    st.session_state.last_bounds = None  # Force refresh
+    st.experimental_rerun()
 
 # Filters
 st.sidebar.header("Filters")
@@ -58,24 +70,19 @@ if st.sidebar.button("Go to Location"):
 map_col, info_col = st.columns([2, 1])
 
 with map_col:
-    # Create base map with current center
-    m = folium.Map(
-        location=st.session_state.map_center,
-        zoom_start=12,
-        tiles='OpenStreetMap',
-        control_scale=True
-    )
-
-    # Display map using st_folium
-    map_data = st_folium(
-        m,
-        width=800,
-        height=600,
-        returned_objects=["bounds", "last_clicked"]
-    )
-
     try:
-        # Get current map bounds if map_data is available
+        # Create fresh map instance
+        m = create_map()
+
+        # Display map using st_folium
+        map_data = st_folium(
+            m,
+            width=800,
+            height=600,
+            returned_objects=["bounds", "last_clicked"]
+        )
+
+        # Process map bounds
         if (map_data and 
             isinstance(map_data, dict) and 
             "bounds" in map_data and 
@@ -103,23 +110,23 @@ with map_col:
                         float(ne["lng"])
                     )
 
+                    # Only fetch new landmarks if bounds changed
                     if bounds != st.session_state.last_bounds:
                         with st.spinner("Fetching landmarks..."):
                             try:
+                                # Create fresh map for adding landmarks
+                                m = create_map()
                                 landmarks = cache_landmarks(bounds)
                                 st.session_state.landmarks = landmarks
                                 st.session_state.last_bounds = bounds
 
-                                # Add landmarks to map with heatmap based on toggle
-                                add_landmarks_to_map(m, landmarks, show_heatmap)
+                                # Add landmarks to fresh map with current heatmap state
+                                add_landmarks_to_map(m, landmarks, st.session_state.show_heatmap)
                             except Exception as e:
                                 st.error(f"Error fetching landmarks: {str(e)}")
                                 st.session_state.landmarks = []
-    except Exception as e:
-        st.error(f"Error processing map data: {str(e)}")
 
-    # Handle clicked location
-    try:
+        # Handle clicked location with fresh map
         if (map_data and 
             isinstance(map_data, dict) and 
             "last_clicked" in map_data and 
@@ -135,11 +142,19 @@ with map_col:
                 clicked_lat = clicked_data["lat"]
                 clicked_lon = clicked_data["lng"]
 
+                # Create fresh map for distance circle
+                m = create_map()
+
+                # Add current landmarks to fresh map
+                if st.session_state.landmarks:
+                    add_landmarks_to_map(m, st.session_state.landmarks, st.session_state.show_heatmap)
+
                 # Draw distance circle if radius is set
                 if radius_km > 0:
                     draw_distance_circle(m, (clicked_lat, clicked_lon), radius_km)
+
     except Exception as e:
-        st.error(f"Error handling clicked location: {str(e)}")
+        st.error(f"Error with map interaction: {str(e)}")
 
 with info_col:
     # Filter landmarks based on search and rating
@@ -154,7 +169,6 @@ with info_col:
     # Display landmarks with enhanced cards
     for landmark in filtered_landmarks:
         with st.expander(landmark['title']):
-            # Display landmark details in a card-like format
             st.markdown(f"""
             <div style='background-color: #f0f2f6; padding: 1rem; border-radius: 0.5rem;'>
                 <h3 style='margin-top: 0;'>{landmark['title']}</h3>
