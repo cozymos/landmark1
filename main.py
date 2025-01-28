@@ -49,7 +49,7 @@ show_heatmap = st.sidebar.checkbox("Show Heatmap", value=st.session_state.show_h
 if show_heatmap != st.session_state.show_heatmap:
     st.session_state.show_heatmap = show_heatmap
     st.session_state.last_bounds = None  # Force refresh
-    st.experimental_rerun()
+    st.rerun()
 
 # Filters
 st.sidebar.header("Filters")
@@ -64,7 +64,7 @@ custom_lon = st.sidebar.number_input("Longitude", value=st.session_state.map_cen
 if st.sidebar.button("Go to Location"):
     st.session_state.map_center = [custom_lat, custom_lon]
     st.session_state.last_bounds = None  # Force refresh
-    st.experimental_rerun()
+    st.rerun()
 
 # Main map container
 map_col, info_col = st.columns([2, 1])
@@ -187,7 +187,7 @@ with info_col:
             with col2:
                 if st.button(f"Center Map ({landmark['title']})", key=f"center_{landmark['title']}"):
                     st.session_state.map_center = list(landmark['coordinates'])
-                    st.experimental_rerun()
+                    st.rerun()
 
 # Footer
 st.markdown("---")
