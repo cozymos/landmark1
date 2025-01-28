@@ -27,66 +27,6 @@ if 'map_center' not in st.session_state:
 if 'zoom_level' not in st.session_state:
     st.session_state.zoom_level = 12
 
-def update_map_state(map_data: dict) -> None:
-    """Update map state from folium map data"""
-    if not map_data or not isinstance(map_data, dict):
-        return
-
-    # Handle center updates
-    center = map_data.get("center")
-    if isinstance(center, dict) and "lat" in center and "lng" in center:
-        try:
-            lat = float(center["lat"])
-            lng = float(center["lng"])
-            if -90 <= lat <= 90 and -180 <= lng <= 180:  # Validate coordinates
-                st.session_state.map_center = [lat, lng]
-        except (ValueError, TypeError):
-            pass
-
-    # Handle zoom updates
-    zoom = map_data.get("zoom")
-    if isinstance(zoom, (int, float)):
-        try:
-            zoom_level = int(zoom)
-            if 1 <= zoom_level <= 18:  # Validate zoom level
-                st.session_state.zoom_level = zoom_level
-        except (ValueError, TypeError):
-            pass
-
-    # Handle bounds updates
-    bounds = map_data.get("bounds")
-    if isinstance(bounds, dict):
-        sw = bounds.get("_southWest", {})
-        ne = bounds.get("_northEast", {})
-
-        try:
-            # Validate that all required values exist and are not None
-            if (isinstance(sw, dict) and isinstance(ne, dict) and
-                sw.get("lat") is not None and sw.get("lng") is not None and
-                ne.get("lat") is not None and ne.get("lng") is not None):
-
-                new_bounds = (
-                    float(sw["lat"]), float(sw["lng"]),
-                    float(ne["lat"]), float(ne["lng"])
-                )
-
-                # Validate bounds
-                if all(-90 <= b <= 90 for b in (new_bounds[0], new_bounds[2])) and \
-                   all(-180 <= b <= 180 for b in (new_bounds[1], new_bounds[3])):
-
-                    # Only update landmarks if bounds changed significantly
-                    if (st.session_state.last_bounds is None or
-                        new_bounds != st.session_state.last_bounds):
-
-                        landmarks = cache_landmarks(new_bounds)
-                        if landmarks:
-                            st.session_state.landmarks = landmarks
-                            st.session_state.last_bounds = new_bounds
-
-        except (ValueError, TypeError) as e:
-            # Silently handle the error to prevent disrupting the user experience
-            pass
-
 # Title and description
 st.title("🗺️ Local Landmarks Explorer")
 st.markdown("""
@@ -114,7 +54,7 @@ custom_lon = st.sidebar.number_input("Longitude", value=st.session_state.map_cen
 
 if st.sidebar.button("Go to Location"):
     st.session_state.map_center = [custom_lat, custom_lon]
-    st.session_state.zoom_level = 12
+    st.session_state.zoom_level = 12  # Reset zoom when moving to new location
 
 # Main map container
 map_col, info_col = st.columns([2, 1])
@@ -132,17 +72,57 @@ with map_col:
         if radius_km > 0:
             draw_distance_circle(m, tuple(st.session_state.map_center), radius_km)
 
-        # Display map with stable key and include all necessary objects
+        # Display map with stable key and include center in returned objects
         map_data = st_folium(
             m,
             width=800,
             height=600,
-            key=f"landmark_explorer_{time.time()}",  # Unique key to prevent unwanted caching
-            returned_objects=["bounds", "center", "zoom"]
+            key="landmark_explorer",
+            returned_objects=["bounds", "center", "zoom"]  # Include center for pan operations
         )
 
-        # Update map state if data is available
-        update_map_state(map_data)
+        # Handle map state updates
+        if isinstance(map_data, dict):
+            # Update center if changed
+            center_data = map_data.get("center")
+            if isinstance(center_data, dict):
+                lat = center_data.get("lat")
+                lng = center_data.get("lng")
+                if lat is not None and lng is not None:
+                    st.session_state.map_center = [float(lat), float(lng)]
+
+            # Update zoom level if changed
+            zoom = map_data.get("zoom")
+            if zoom is not None:
+                st.session_state.zoom_level = zoom
+
+            # Handle bounds updates if available
+            bounds = map_data.get("bounds")
+            if isinstance(bounds, dict):
+                sw = bounds.get("_southWest", {})
+                ne = bounds.get("_northEast", {})
+
+                if (isinstance(sw, dict) and isinstance(ne, dict) and
+                    "lat" in sw and "lng" in sw and
+                    "lat" in ne and "lng" in ne):
+
+                    new_bounds = (
+                        float(sw["lat"]),
+                        float(sw["lng"]),
+                        float(ne["lat"]),
+                        float(ne["lng"])
+                    )
+
+                    # Update landmarks if bounds changed significantly
+                    if (st.session_state.last_bounds is None or
+                        new_bounds != st.session_state.last_bounds):
+                        try:
+                            landmarks = cache_landmarks(new_bounds)
+                            if landmarks:
+                                st.session_state.landmarks = landmarks
+                                st.session_state.last_bounds = new_bounds
+                        except Exception as e:
+                            st.error(f"Error fetching landmarks: {str(e)}")
 
     except Exception as e:
         st.error(f"Error rendering map: {str(e)}")
