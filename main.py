@@ -9,6 +9,7 @@ from urllib.parse import quote, unquote
 import json
 from journey_tracker import JourneyTracker
 import hashlib
+import os
 
 # Page config
 st.set_page_config(
@@ -75,6 +76,7 @@ if st.sidebar.button("Go to Location"):
     st.query_params['center'] = f"{custom_lat},{custom_lon}"
     st.query_params['zoom'] = str(st.session_state.zoom_level)
 
+# Journey Progress
 st.sidebar.markdown("---")
 st.sidebar.header("🗺️ Journey Progress")
 
@@ -101,14 +103,20 @@ if progress["next_achievement"]:
     st.sidebar.caption(next_achievement.description)
     st.sidebar.progress(min(total_discovered / next_achievement.requirement, 1.0))
 
-
 # Main map container
 map_col, info_col = st.columns([2, 1])
 
 with map_col:
     try:
-        # Create base map
-        m = create_base_map()
+        # Create base map with Google Maps tiles
+        m = folium.Map(
+            location=st.session_state.map_center,
+            zoom_start=st.session_state.zoom_level,
+            tiles=f"https://mt1.google.com/vt/lyrs=m&x={{x}}&y={{y}}&z={{z}}&key={os.environ['GOOGLE_MAPS_API_KEY']}",
+            attr="Google Maps",
+            control_scale=True,
+            prefer_canvas=True
+        )
 
         # Add landmarks to map
         if st.session_state.landmarks:
@@ -118,7 +126,7 @@ with map_col:
         if radius_km > 0:
             draw_distance_circle(m, tuple(st.session_state.map_center), radius_km)
 
-        # Display map with stable key and include center in returned objects
+        # Display map
         map_data = st_folium(
             m,
             width=800,
@@ -127,53 +135,37 @@ with map_col:
             returned_objects=["bounds", "center", "zoom"]
         )
 
-        # Map data handling functions
-        def safe_float(value, default=0.0):
-            """Safely convert value to float with fallback"""
-            try:
-                if value is not None:
-                    return float(value)
-                return default
-            except (ValueError, TypeError):
-                return default
-
-        # Handle map state updates
+        # Handle map interactions
         if isinstance(map_data, dict):
             # Update center if changed
             center_data = map_data.get("center")
             if isinstance(center_data, dict):
-                lat = safe_float(center_data.get("lat"), st.session_state.map_center[0])
-                lng = safe_float(center_data.get("lng"), st.session_state.map_center[1])
+                lat = float(center_data.get("lat", st.session_state.map_center[0]))
+                lng = float(center_data.get("lng", st.session_state.map_center[1]))
                 st.session_state.map_center = [lat, lng]
-                # Update URL parameters
                 st.query_params['center'] = f"{lat},{lng}"
-                st.query_params['zoom'] = str(st.session_state.zoom_level)
 
             # Update zoom level if changed
             zoom = map_data.get("zoom")
             if zoom is not None:
                 st.session_state.zoom_level = int(zoom)
-                # Update URL parameters
-                st.query_params['center'] = f"{st.session_state.map_center[0]},{st.session_state.map_center[1]}"
                 st.query_params['zoom'] = str(zoom)
 
-            # Handle bounds updates if available
+            # Handle bounds updates
             bounds = map_data.get("bounds")
             if isinstance(bounds, dict):
                 sw = bounds.get("_southWest", {})
                 ne = bounds.get("_northEast", {})
 
-                if (isinstance(sw, dict) and isinstance(ne, dict)):
+                if isinstance(sw, dict) and isinstance(ne, dict):
                     new_bounds = (
-                        safe_float(sw.get("lat")),
-                        safe_float(sw.get("lng")),
-                        safe_float(ne.get("lat")),
-                        safe_float(ne.get("lng"))
+                        float(sw.get("lat", 0)),
+                        float(sw.get("lng", 0)),
+                        float(ne.get("lat", 0)),
+                        float(ne.get("lng", 0))
                     )
 
-                    # Only update if we have valid bounds
                     if all(isinstance(x, float) for x in new_bounds):
-                        # Update landmarks if bounds changed significantly
                         if (st.session_state.last_bounds is None or
                             new_bounds != st.session_state.last_bounds):
                             try:
