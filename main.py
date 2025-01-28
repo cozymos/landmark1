@@ -58,59 +58,69 @@ if st.sidebar.button("Go to Location"):
 map_col, info_col = st.columns([2, 1])
 
 with map_col:
-    # Create base map with current state
-    m = create_base_map()  # Use the utility function that's already defined
+    try:
+        # Create base map
+        m = create_base_map()
 
-    # Add current landmarks to map if available
-    if st.session_state.landmarks:
-        add_landmarks_to_map(m, st.session_state.landmarks, show_heatmap)
+        # Add landmarks to map
+        if st.session_state.landmarks:
+            add_landmarks_to_map(m, st.session_state.landmarks, show_heatmap)
 
-    # Add distance circle if radius is set
-    if radius_km > 0:
-        draw_distance_circle(m, st.session_state.map_center, radius_km)
+        # Add distance circle if radius is set
+        if radius_km > 0:
+            draw_distance_circle(m, tuple(st.session_state.map_center), radius_km)
 
-    # Display map with all current state
-    map_data = st_folium(
-        m,
-        key="main_map",  # Add a stable key to maintain state
-        width=800,
-        height=600,
-        returned_objects=["bounds", "center", "zoom"],
-    )
+        # Display map with state persistence
+        map_data = st_folium(
+            m,
+            key=f"landmark_map_{st.session_state.map_center[0]}_{st.session_state.map_center[1]}",
+            width=800,
+            height=600,
+            returned_objects=["bounds", "center", "zoom"]
+        )
 
-    # Update map state if data is available
-    if map_data:
-        # Update center and zoom if available
-        if "center" in map_data and map_data["center"]:
-            st.session_state.map_center = [
-                map_data["center"]["lat"],
-                map_data["center"]["lng"]
-            ]
-        if "zoom" in map_data and map_data["zoom"]:
-            st.session_state.zoom_level = map_data["zoom"]
+        # Update map state if data is available
+        if map_data:
+            # Update center and zoom
+            center_data = map_data.get("center", {})
+            if center_data and isinstance(center_data, dict):
+                lat = center_data.get("lat")
+                lng = center_data.get("lng")
+                if lat is not None and lng is not None:
+                    st.session_state.map_center = [float(lat), float(lng)]
 
-        # Process bounds for landmarks
-        if "bounds" in map_data and map_data["bounds"]:
-            bounds_data = map_data["bounds"]
-            sw = bounds_data.get("_southWest", {})
-            ne = bounds_data.get("_northEast", {})
+            zoom = map_data.get("zoom")
+            if zoom is not None:
+                st.session_state.zoom_level = zoom
 
-            if sw and ne and all(key in sw and key in ne for key in ["lat", "lng"]):
-                new_bounds = (
-                    float(sw["lat"]),
-                    float(sw["lng"]),
-                    float(ne["lat"]),
-                    float(ne["lng"])
-                )
+            # Process bounds for landmarks
+            bounds_data = map_data.get("bounds", {})
+            if bounds_data and isinstance(bounds_data, dict):
+                sw = bounds_data.get("_southWest", {})
+                ne = bounds_data.get("_northEast", {})
 
-                # Only fetch new landmarks if bounds have changed
-                if new_bounds != st.session_state.last_bounds:
-                    try:
-                        landmarks = cache_landmarks(new_bounds)
-                        st.session_state.landmarks = landmarks
-                        st.session_state.last_bounds = new_bounds
-                    except Exception as e:
-                        st.error(f"Error fetching landmarks: {str(e)}")
+                if (sw and ne and 
+                    all(key in sw and sw[key] is not None for key in ["lat", "lng"]) and
+                    all(key in ne and ne[key] is not None for key in ["lat", "lng"])):
+
+                    new_bounds = (
+                        float(sw["lat"]),
+                        float(sw["lng"]),
+                        float(ne["lat"]),
+                        float(ne["lng"])
+                    )
+
+                    # Only fetch new landmarks if bounds have changed
+                    if new_bounds != st.session_state.last_bounds:
+                        try:
+                            landmarks = cache_landmarks(new_bounds)
+                            st.session_state.landmarks = landmarks
+                            st.session_state.last_bounds = new_bounds
+                        except Exception as e:
+                            st.error(f"Error fetching landmarks: {str(e)}")
+
+    except Exception as e:
+        st.error(f"Error rendering map: {str(e)}")
 
 with info_col:
     # Filter landmarks based on search and rating
