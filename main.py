@@ -70,38 +70,34 @@ with map_col:
         if radius_km > 0:
             draw_distance_circle(m, tuple(st.session_state.map_center), radius_km)
 
-        # Display map with state persistence
+        # Display map with stable key for persistence
         map_data = st_folium(
             m,
-            key=f"landmark_map_{st.session_state.map_center[0]}_{st.session_state.map_center[1]}",
+            key="landmark_explorer_map",  # Use a stable key
             width=800,
             height=600,
             returned_objects=["bounds", "center", "zoom"]
         )
 
-        # Update map state if data is available
-        if map_data:
-            # Update center and zoom
-            center_data = map_data.get("center", {})
-            if center_data and isinstance(center_data, dict):
-                lat = center_data.get("lat")
-                lng = center_data.get("lng")
-                if lat is not None and lng is not None:
-                    st.session_state.map_center = [float(lat), float(lng)]
+        # Handle map updates carefully
+        if isinstance(map_data, dict):  # Ensure map_data is valid
+            # Update center and zoom level
+            center = map_data.get("center")
+            if isinstance(center, dict) and "lat" in center and "lng" in center:
+                st.session_state.map_center = [float(center["lat"]), float(center["lng"])]
 
             zoom = map_data.get("zoom")
-            if zoom is not None:
+            if isinstance(zoom, (int, float)):
                 st.session_state.zoom_level = zoom
 
-            # Process bounds for landmarks
-            bounds_data = map_data.get("bounds", {})
-            if bounds_data and isinstance(bounds_data, dict):
-                sw = bounds_data.get("_southWest", {})
-                ne = bounds_data.get("_northEast", {})
+            # Handle bounds updates
+            bounds = map_data.get("bounds")
+            if isinstance(bounds, dict):
+                sw = bounds.get("_southWest", {})
+                ne = bounds.get("_northEast", {})
 
-                if (sw and ne and 
-                    all(key in sw and sw[key] is not None for key in ["lat", "lng"]) and
-                    all(key in ne and ne[key] is not None for key in ["lat", "lng"])):
+                if (isinstance(sw, dict) and isinstance(ne, dict) and
+                    all(k in sw and k in ne for k in ["lat", "lng"])):
 
                     new_bounds = (
                         float(sw["lat"]),
@@ -110,12 +106,13 @@ with map_col:
                         float(ne["lng"])
                     )
 
-                    # Only fetch new landmarks if bounds have changed
+                    # Only update landmarks if bounds changed
                     if new_bounds != st.session_state.last_bounds:
                         try:
                             landmarks = cache_landmarks(new_bounds)
-                            st.session_state.landmarks = landmarks
-                            st.session_state.last_bounds = new_bounds
+                            if landmarks:  # Only update if we got valid landmarks
+                                st.session_state.landmarks = landmarks
+                                st.session_state.last_bounds = new_bounds
                         except Exception as e:
                             st.error(f"Error fetching landmarks: {str(e)}")
 
