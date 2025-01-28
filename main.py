@@ -23,7 +23,7 @@ if 'selected_landmark' not in st.session_state:
 if 'show_heatmap' not in st.session_state:
     st.session_state.show_heatmap = False
 if 'map_center' not in st.session_state:
-    st.session_state.map_center = [37.7749, -122.4194]
+    st.session_state.map_center = [37.7749, -122.4194]  # Default to San Francisco
 
 # Title and description
 st.title("🗺️ Local Landmarks Explorer")
@@ -51,15 +51,18 @@ custom_lat = st.sidebar.number_input("Latitude", value=st.session_state.map_cent
 custom_lon = st.sidebar.number_input("Longitude", value=st.session_state.map_center[1], format="%.4f")
 if st.sidebar.button("Go to Location"):
     st.session_state.map_center = [custom_lat, custom_lon]
-    st.session_state.last_bounds = None
-
 
 # Main map container
 map_col, info_col = st.columns([2, 1])
 
 with map_col:
-    # Create base map
-    m = create_base_map()
+    # Create base map centered at current location
+    m = folium.Map(
+        location=st.session_state.map_center,
+        zoom_start=12,
+        tiles='OpenStreetMap',
+        control_scale=True
+    )
 
     # Add current landmarks to map if available
     if st.session_state.landmarks:
@@ -70,8 +73,12 @@ with map_col:
         m,
         width=800,
         height=600,
-        returned_objects=["bounds", "last_clicked"]
+        returned_objects=["bounds", "center", "zoom", "last_clicked"]
     )
+
+    # Update map center if changed
+    if map_data and "center" in map_data and map_data["center"]:
+        st.session_state.map_center = [map_data["center"]["lat"], map_data["center"]["lng"]]
 
     # Process map bounds
     if map_data and "bounds" in map_data and map_data["bounds"]:
