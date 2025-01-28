@@ -80,29 +80,25 @@ with map_col:
         ne = bounds_data.get("_northEast", {})
 
         if sw and ne and "lat" in sw and "lng" in sw and "lat" in ne and "lng" in ne:
-            try:
-                new_bounds = (
-                    float(sw["lat"]),
-                    float(sw["lng"]),
-                    float(ne["lat"]),
-                    float(ne["lng"])
-                )
+            new_bounds = (
+                float(sw["lat"]),
+                float(sw["lng"]),
+                float(ne["lat"]),
+                float(ne["lng"])
+            )
 
-                # Update landmarks only if bounds changed
-                if new_bounds != st.session_state.last_bounds:
-                    with st.spinner("Fetching landmarks..."):
-                        try:
-                            landmarks = cache_landmarks(new_bounds)
-                            if landmarks:
-                                st.session_state.landmarks = landmarks
-                                st.session_state.last_bounds = new_bounds
-                                st.rerun()
-                        except Exception as e:
-                            st.error(f"Error fetching landmarks: {str(e)}")
-            except Exception as e:
-                st.error(f"Error processing map coordinates: {str(e)}")
+            # Update landmarks only if bounds changed significantly
+            if new_bounds != st.session_state.last_bounds:
+                try:
+                    landmarks = cache_landmarks(new_bounds)
+                    if landmarks:
+                        st.session_state.landmarks = landmarks
+                        st.session_state.last_bounds = new_bounds
+                        st.rerun()
+                except Exception as e:
+                    st.error(f"Error fetching landmarks: {str(e)}")
 
-    # Handle clicked location
+    # Handle clicked location for distance circle
     if map_data and "last_clicked" in map_data and map_data["last_clicked"]:
         clicked = map_data["last_clicked"]
         if "lat" in clicked and "lng" in clicked and radius_km > 0:
