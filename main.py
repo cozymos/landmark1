@@ -79,7 +79,7 @@ with map_col:
         sw = bounds_data.get("_southWest", {})
         ne = bounds_data.get("_northEast", {})
 
-        if sw and ne and "lat" in sw and "lng" in sw and "lat" in ne and "lng" in ne:
+        if sw and ne and all(key in sw and key in ne for key in ["lat", "lng"]):
             new_bounds = (
                 float(sw["lat"]),
                 float(sw["lng"]),
@@ -87,14 +87,12 @@ with map_col:
                 float(ne["lng"])
             )
 
-            # Update landmarks only if bounds changed significantly
+            # Only fetch new landmarks if bounds have changed
             if new_bounds != st.session_state.last_bounds:
                 try:
                     landmarks = cache_landmarks(new_bounds)
-                    if landmarks:
-                        st.session_state.landmarks = landmarks
-                        st.session_state.last_bounds = new_bounds
-                        st.rerun()
+                    st.session_state.landmarks = landmarks
+                    st.session_state.last_bounds = new_bounds
                 except Exception as e:
                     st.error(f"Error fetching landmarks: {str(e)}")
 
