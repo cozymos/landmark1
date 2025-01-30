@@ -459,7 +459,8 @@ with info_col:
             # Record interaction with landmark
             st.session_state.recommender.record_interaction(
                 str(landmark['coordinates']),
-                landmark.get('type', 'landmark')
+                landmark.get('type', 'landmark'),
+                landmark['distance']  # Add the distance parameter
             )
 
             # Display the landmark image if available and valid
