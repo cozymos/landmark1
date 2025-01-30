@@ -34,9 +34,9 @@ class OfflineCacheManager:
             # Use Google Maps tiles when online
             return f"https://mt1.google.com/vt/lyrs=m&x={{x}}&y={{y}}&z={{z}}&key={api_key}"
 
-    def cache_landmarks(self, landmarks: List[Dict], bounds: Tuple[float, float, float, float]):
+    def cache_landmarks(self, landmarks: List[Dict], bounds: Tuple[float, float, float, float], language: str):
         """Cache landmark data for offline use"""
-        bounds_key = "_".join(str(round(b, 3)) for b in bounds)
+        bounds_key = f"{language}_" + "_".join(str(round(b, 3)) for b in bounds)
         cache_path = os.path.join(self.landmarks_dir, f"landmarks_{bounds_key}.json")
 
         try:
@@ -45,21 +45,22 @@ class OfflineCacheManager:
                 json.dump({
                     'landmarks': landmarks,
                     'timestamp': time.time(),
-                    'bounds': bounds
+                    'bounds': bounds,
+                    'language': language
                 }, f)
         except Exception as e:
             st.warning(f"Failed to cache landmarks: {str(e)}")
 
-    def get_cached_landmarks(self, bounds: Tuple[float, float, float, float], max_age_hours: int = 24) -> List[Dict]:
+    def get_cached_landmarks(self, bounds: Tuple[float, float, float, float], language: str, max_age_hours: int = 24) -> List[Dict]:
         """Retrieve cached landmarks"""
         try:
-            # Find the closest cached bounds
+            # Find the closest cached bounds for the specified language
             closest_cache = None
             min_distance = float('inf')
 
             for cache_file in os.listdir(self.landmarks_dir):
-                if cache_file.startswith('landmarks_'):
-                    cached_bounds = [float(x) for x in cache_file[10:-5].split('_')]
+                if cache_file.startswith(f'landmarks_{language}_'):
+                    cached_bounds = [float(x) for x in cache_file.split('_')[2:-1]]  # Skip language prefix and .json
                     distance = sum((a - b) ** 2 for a, b in zip(bounds, cached_bounds))
 
                     if distance < min_distance:
@@ -71,9 +72,9 @@ class OfflineCacheManager:
                 with open(cache_path, 'r') as f:
                     cache_data = json.load(f)
 
-                # Check if cache is still valid
+                # Check if cache is still valid and matches the requested language
                 age_hours = (time.time() - cache_data['timestamp']) / 3600
-                if age_hours <= max_age_hours:
+                if age_hours <= max_age_hours and cache_data.get('language') == language:
                     return cache_data['landmarks']
 
             return []
@@ -103,24 +104,25 @@ cache_manager = OfflineCacheManager()
 def get_cached_landmarks(
     bounds: Tuple[float, float, float, float],
     zoom_level: int,
-    offline_mode: bool = False
+    offline_mode: bool = False,
+    language: str = 'en'
 ) -> List[Dict]:
     """
     Smart wrapper for landmark caching with offline support
     """
     try:
         if offline_mode:
-            return cache_manager.get_cached_landmarks(bounds)
+            return cache_manager.get_cached_landmarks(bounds, language)
 
         # Only fetch new landmarks if zoom level is appropriate
         if zoom_level >= 8:  # Prevent fetching at very low zoom levels
-            from google_places import GooglePlacesHandler
-            places_handler = GooglePlacesHandler()
-            landmarks = places_handler.get_landmarks(bounds)
+            from wiki_handler import WikiLandmarkFetcher
+            wiki_fetcher = WikiLandmarkFetcher()
+            landmarks = wiki_fetcher.get_landmarks(bounds, language) #added language parameter
 
             # Cache the landmarks for offline use
             if landmarks:
-                cache_manager.cache_landmarks(landmarks, bounds)
+                cache_manager.cache_landmarks(landmarks, bounds, language)
 
             return landmarks
         return []
@@ -128,5 +130,5 @@ def get_cached_landmarks(
     except Exception as e:
         st.error(f"Error fetching landmarks: {str(e)}")
         if offline_mode:
-            return cache_manager.get_cached_landmarks(bounds)
+            return cache_manager.get_cached_landmarks(bounds, language)
         return []

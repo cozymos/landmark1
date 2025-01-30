@@ -13,6 +13,8 @@ import os
 from recommender import LandmarkRecommender
 from weather_handler import WeatherHandler
 from coord_utils import parse_coordinates, format_dms
+from wiki_handler import WikiLandmarkFetcher  # Fixed import
+
 
 # Page config
 st.set_page_config(
@@ -56,6 +58,9 @@ if 'weather_handler' not in st.session_state:
     st.session_state.weather_handler = WeatherHandler()
 if 'offline_mode' not in st.session_state:
     st.session_state.offline_mode = False
+if 'wiki_language' not in st.session_state: #added for language selection
+    st.session_state.wiki_language = "en" #default language
+
 
 # CSS styling for recommendations
 st.markdown("""
@@ -160,6 +165,30 @@ if offline_mode != st.session_state.offline_mode:
         st.sidebar.info("🔄 Offline mode enabled. Using cached map data.")
     else:
         st.sidebar.info("🌐 Online mode enabled. Fetching live data.")
+
+
+# Language selector
+st.sidebar.markdown("---")
+st.sidebar.header("🌍 Language Settings")
+wiki_fetcher = WikiLandmarkFetcher()
+languages = wiki_fetcher.get_supported_languages()
+selected_language = st.sidebar.selectbox(
+    "Select Language",
+    options=list(languages.keys()),
+    format_func=lambda x: languages[x],
+    index=list(languages.keys()).index(st.session_state.wiki_language),
+    help="Choose the language for landmark information"
+)
+
+# Update language if changed
+if selected_language != st.session_state.wiki_language:
+    if wiki_fetcher.set_language(selected_language):
+        st.session_state.wiki_language = selected_language # Update session state
+        st.sidebar.success(f"Language changed to {languages[selected_language]}")
+        # Clear current landmarks to trigger refresh
+        st.session_state.landmarks = []
+    else:
+        st.sidebar.error("Failed to change language")
 
 
 # Filters
@@ -362,7 +391,8 @@ with map_col:
                         landmarks = get_cached_landmarks(
                             new_bounds,
                             st.session_state.zoom_level,
-                            st.session_state.offline_mode
+                            st.session_state.offline_mode,
+                            st.session_state.wiki_language #pass language
                         )
                         if landmarks:
                             st.session_state.landmarks = landmarks
@@ -440,8 +470,8 @@ Data sourced from Google Places. Updates automatically as you explore the map.
 * 🔵 Blue markers: Lower relevance landmarks
 """)
 
-def get_cached_landmarks(bounds, zoom_level, offline_mode):
+def get_cached_landmarks(bounds, zoom_level, offline_mode, language): #added language parameter
     try:
-        return cache_manager.cache_landmarks(bounds, zoom_level, offline_mode)
+        return cache_manager.cache_landmarks(bounds, zoom_level, offline_mode, language) #pass language to cache_manager
     except:
         return []
