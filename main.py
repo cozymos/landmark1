@@ -217,16 +217,17 @@ lon_input = st.sidebar.number_input(
     key="lon_input"
 )
 
-# Update combined input if separate fields are modified
-if not coords_valid and (lat_input != st.session_state.map_center[0] or lon_input != st.session_state.map_center[1]):
+# Update values from separate inputs if combined input is empty
+if not combined_coords:
     custom_lat = lat_input
     custom_lon = lon_input
     # Show both formats for separate input values
-    st.sidebar.success(f"""
-    ✅ Current coordinates:
-    • DD: {custom_lat:.4f}, {custom_lon:.4f}
-    • DMS: {format_dms(custom_lat, True)}, {format_dms(custom_lon, False)}
-    """)
+    if -90 <= lat_input <= 90 and -180 <= lon_input <= 180:
+        st.sidebar.success(f"""
+        ✅ Current coordinates:
+        • DD: {custom_lat:.4f}, {custom_lon:.4f}
+        • DMS: {format_dms(custom_lat, True)}, {format_dms(custom_lon, False)}
+        """)
 
 if st.sidebar.button("Go to Location"):
     if custom_lat is not None and custom_lon is not None and -90 <= custom_lat <= 90 and -180 <= custom_lon <= 180:
