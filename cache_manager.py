@@ -22,15 +22,9 @@ class OfflineCacheManager:
         for directory in [self.cache_dir, self.tiles_dir, self.landmarks_dir, self.images_dir]:
             os.makedirs(directory, exist_ok=True)
 
-        # Initialize cache in session state
+        # Initialize offline mode if not present
         if 'offline_mode' not in st.session_state:
             st.session_state.offline_mode = False
-        if 'cache_stats' not in st.session_state:
-            st.session_state.cache_stats = {
-                'landmarks_cached': 0,
-                'images_cached': 0,
-                'last_update': None
-            }
 
     def get_tile_url(self, api_key: str) -> str:
         """Get appropriate tile URL based on mode"""

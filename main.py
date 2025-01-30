@@ -154,6 +154,13 @@ if 'map_center' not in st.session_state:
     except:
         st.session_state.map_center = [37.7749, -122.4194]  # Default to San Francisco
 
+# Initialize all session state variables
+if 'cache_stats' not in st.session_state:
+    st.session_state.cache_stats = {
+        'landmarks_cached': 0,
+        'images_cached': 0,
+        'last_update': None
+    }
 if 'zoom_level' not in st.session_state:
     try:
         st.session_state.zoom_level = int(st.query_params.get('zoom', '12'))
