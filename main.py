@@ -106,7 +106,7 @@ if st.session_state.landmarks:
             with rec_cols[i]:
                 st.markdown(f"""
                 <div class="recommendation-card">
-                    {'<img src="' + landmark['image_url'] + '" class="recommended-image">' if 'image_url' in landmark else ''}
+                    {f'<img src="{landmark["image_url"]}" class="recommended-image">' if landmark.get('image_url') else ''}
                     <div class="recommendation-title">{landmark['title']}</div>
                     <div class="recommendation-score">Score: {landmark['personalized_score']:.2f}</div>
                 </div>
@@ -119,6 +119,7 @@ if st.session_state.landmarks:
                         st.success("Added to favorites!")
                     else:
                         st.info("Removed from favorites")
+
 
 
 # Sidebar controls
@@ -331,9 +332,12 @@ with info_col:
                 landmark.get('type', 'landmark')
             )
 
-            # Display the landmark image if available
-            if 'image_url' in landmark:
-                st.image(landmark['image_url'], caption=landmark['title'], use_container_width=True)
+            # Display the landmark image if available and valid
+            if landmark.get('image_url'):
+                try:
+                    st.image(landmark['image_url'], caption=landmark['title'], use_container_width=True)
+                except Exception as e:
+                    st.warning(f"Could not load image for {landmark['title']}")
 
             st.markdown(f"""
             <div style='background-color: #f0f2f6; padding: 1rem; border-radius: 0.5rem;'>
