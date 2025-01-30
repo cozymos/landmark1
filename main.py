@@ -177,14 +177,21 @@ combined_coords = st.sidebar.text_input(
     help="Enter coordinates in either format:\n" +
          "• Decimal Degrees (DD): 37.3349, -122.0090\n" +
          "• DMS: 37°20'5.64\"N, 122°0'32.40\"W",
-    placeholder="Enter coordinates (DD or DMS)"
+    placeholder="Enter coordinates (DD or DMS)",
+    key="combined_coords"
 )
+
+# Initialize coordinate values
+custom_lat = None
+custom_lon = None
+coords_valid = False
 
 if combined_coords:
     coords = parse_coordinates(combined_coords)
     if coords:
         custom_lat = coords.lat
         custom_lon = coords.lon
+        coords_valid = True
         st.sidebar.success(f"""
         ✅ Valid coordinates:
         • DD: {custom_lat:.4f}, {custom_lon:.4f}
@@ -192,26 +199,44 @@ if combined_coords:
         """)
     else:
         st.sidebar.error("Invalid coordinate format. Please use DD or DMS format.")
-else:
-    # Separate lat/lon inputs as fallback
-    custom_lat = st.sidebar.number_input("Latitude", 
-        value=st.session_state.map_center[0], 
-        format="%.4f",
-        help="Decimal degrees (e.g., 37.3349)"
-    )
-    custom_lon = st.sidebar.number_input("Longitude", 
-        value=st.session_state.map_center[1], 
-        format="%.4f",
-        help="Decimal degrees (e.g., -122.0090)"
-    )
+
+# Separate lat/lon inputs with synced values
+lat_input = st.sidebar.number_input(
+    "Latitude", 
+    value=float(custom_lat if custom_lat is not None else st.session_state.map_center[0]),
+    format="%.4f",
+    help="Decimal degrees (e.g., 37.3349)",
+    key="lat_input"
+)
+
+lon_input = st.sidebar.number_input(
+    "Longitude", 
+    value=float(custom_lon if custom_lon is not None else st.session_state.map_center[1]),
+    format="%.4f",
+    help="Decimal degrees (e.g., -122.0090)",
+    key="lon_input"
+)
+
+# Update combined input if separate fields are modified
+if not coords_valid and (lat_input != st.session_state.map_center[0] or lon_input != st.session_state.map_center[1]):
+    custom_lat = lat_input
+    custom_lon = lon_input
+    # Show both formats for separate input values
+    st.sidebar.success(f"""
+    ✅ Current coordinates:
+    • DD: {custom_lat:.4f}, {custom_lon:.4f}
+    • DMS: {format_dms(custom_lat, True)}, {format_dms(custom_lon, False)}
+    """)
 
 if st.sidebar.button("Go to Location"):
-    if -90 <= custom_lat <= 90 and -180 <= custom_lon <= 180:
+    if custom_lat is not None and custom_lon is not None and -90 <= custom_lat <= 90 and -180 <= custom_lon <= 180:
         st.session_state.map_center = [custom_lat, custom_lon]
         st.session_state.zoom_level = 12
         # Update URL parameters
         st.query_params['center'] = f"{custom_lat},{custom_lon}"
         st.query_params['zoom'] = str(st.session_state.zoom_level)
+        # Clear the combined input
+        st.session_state.combined_coords = ""
     else:
         st.sidebar.error("Invalid coordinates. Latitude must be between -90 and 90, longitude between -180 and 180.")
 
