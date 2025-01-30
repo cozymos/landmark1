@@ -118,7 +118,7 @@ def get_cached_landmarks(
         if zoom_level >= 8:  # Prevent fetching at very low zoom levels
             from wiki_handler import WikiLandmarkFetcher
             wiki_fetcher = WikiLandmarkFetcher()
-            landmarks = wiki_fetcher.get_landmarks(bounds, language) #added language parameter
+            landmarks = wiki_fetcher.get_landmarks(bounds)  # No need to pass language as it's managed in the class
 
             # Cache the landmarks for offline use
             if landmarks:
