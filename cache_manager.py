@@ -9,6 +9,7 @@ from functools import partial
 import folium
 from PIL import Image
 from io import BytesIO
+import hashlib
 
 class OfflineCacheManager:
     def __init__(self):
@@ -38,40 +39,51 @@ class OfflineCacheManager:
     def _cache_image(self, image_url: str) -> str:
         """Download and cache an image, return filename if successful"""
         try:
-            # Generate filename from URL
-            filename = os.path.join(self.images_dir, f"{hash(image_url)}.jpg")
+            # Generate filename from URL using a more reliable hash
+            safe_hash = hashlib.md5(image_url.encode()).hexdigest()
+            filename = os.path.join(self.images_dir, f"{safe_hash}.jpg")
+
+            # Debug logging
+            st.write(f"Debug - Caching image from URL: {image_url}")
+            st.write(f"Debug - Cache path: {filename}")
 
             # Skip if already cached
             if os.path.exists(filename):
+                st.write(f"Debug - Using existing cached file")
                 return os.path.abspath(filename)
 
             # Download and save image
-            response = requests.get(image_url)
+            response = requests.get(image_url, timeout=10)
             if response.status_code == 200:
-                img = Image.open(BytesIO(response.content))
-                img.save(filename, 'JPEG')
+                with open(filename, 'wb') as f:
+                    f.write(response.content)
+                st.write(f"Debug - Successfully cached new image")
                 return os.path.abspath(filename)
 
         except Exception as e:
-            st.warning(f"Failed to cache image: {str(e)}")
+            st.write(f"Debug - Error caching image: {str(e)}")
             return ""
 
     def cache_landmarks(self, landmarks: List[Dict], bounds: Tuple[float, float, float, float], language: str):
         """Cache landmark data and associated images for offline use"""
-        bounds_key = f"{language}_" + "_".join(str(round(b, 3)) for b in bounds)
-        cache_path = os.path.join(self.landmarks_dir, f"landmarks_{bounds_key}.json")
-
         try:
-            # Cache landmark data
+            bounds_key = f"{language}_" + "_".join(str(round(b, 3)) for b in bounds)
+            cache_path = os.path.join(self.landmarks_dir, f"landmarks_{bounds_key}.json")
+
+            # Debug logging
+            st.write(f"Debug - Caching landmarks to: {cache_path}")
+
             cached_landmarks = []
             for landmark in landmarks:
                 cached_landmark = landmark.copy()
 
-                # Always cache image if available and update image_url to cached path
+                # Cache image if available
                 if 'image_url' in landmark and landmark['image_url']:
+                    st.write(f"Debug - Processing image for landmark: {landmark['title']}")
                     cached_path = self._cache_image(landmark['image_url'])
                     if cached_path:
                         cached_landmark['image_url'] = cached_path
+                        st.write(f"Debug - Cached image path: {cached_path}")
 
                 cached_landmarks.append(cached_landmark)
 
@@ -84,19 +96,10 @@ class OfflineCacheManager:
                     'language': language
                 }, f)
 
-            # Update cache stats
-            if 'cache_stats' not in st.session_state:
-                st.session_state.cache_stats = {
-                    'landmarks_cached': 0,
-                    'images_cached': 0,
-                    'last_update': None
-                }
-            st.session_state.cache_stats['landmarks_cached'] = len(os.listdir(self.landmarks_dir))
-            st.session_state.cache_stats['images_cached'] = len(os.listdir(self.images_dir))
-            st.session_state.cache_stats['last_update'] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            st.write(f"Debug - Successfully cached {len(cached_landmarks)} landmarks")
 
         except Exception as e:
-            st.warning(f"Failed to cache landmarks: {str(e)}")
+            st.write(f"Debug - Error in cache_landmarks: {str(e)}")
 
     def get_cached_landmarks(self, bounds: Tuple[float, float, float, float], language: str, max_age_hours: int = 24) -> List[Dict]:
         """Retrieve cached landmarks with smart bounds matching"""

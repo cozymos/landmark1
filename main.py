@@ -352,9 +352,20 @@ if st.session_state.landmarks:
             # Simple image display using cached path
             image_path = landmark.get('image_url', '')
 
+            # Debug logging for image paths
+            st.write(f"Debug - Image path: {image_path}")
+            st.write(f"Debug - File exists: {os.path.exists(image_path)}")
+
+            # Ensure proper file:// URL format
+            if image_path and os.path.exists(image_path):
+                display_url = f"file://{os.path.abspath(image_path)}"
+                st.write(f"Debug - Display URL: {display_url}")
+            else:
+                display_url = 'https://via.placeholder.com/300x200?text=No+Image'
+
             st.markdown(f"""
             <div class="recommendation-card">
-                <img src="file://{image_path}" 
+                <img src="{display_url}" 
                      class="recommended-image"
                      alt="{landmark['title']}"
                      onerror="this.src='https://via.placeholder.com/300x200?text=No+Image';">
