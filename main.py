@@ -353,15 +353,23 @@ if st.session_state.landmarks:
             image_path = landmark.get('image_url', '')
 
             # Debug logging for image paths
-            st.write(f"Debug - Image path: {image_path}")
-            st.write(f"Debug - File exists: {os.path.exists(image_path)}")
+            st.write(f"Debug - Processing landmark: {landmark['title']}")
+            st.write(f"Debug - Raw image path: {image_path}")
 
-            # Ensure proper file:// URL format
+            # Check if the image file exists and is readable
             if image_path and os.path.exists(image_path):
-                display_url = f"file://{os.path.abspath(image_path)}"
-                st.write(f"Debug - Display URL: {display_url}")
+                try:
+                    # Verify file is readable
+                    with open(image_path, 'rb') as f:
+                        f.read(1)
+                    display_url = f"file://{image_path}"
+                    st.write(f"Debug - Valid image path: {display_url}")
+                except Exception as e:
+                    st.write(f"Debug - Error reading image file: {str(e)}")
+                    display_url = 'https://via.placeholder.com/300x200?text=No+Image'
             else:
                 display_url = 'https://via.placeholder.com/300x200?text=No+Image'
+                st.write(f"Debug - Using placeholder image")
 
             st.markdown(f"""
             <div class="recommendation-card">

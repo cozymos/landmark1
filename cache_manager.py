@@ -13,19 +13,103 @@ import hashlib
 
 class OfflineCacheManager:
     def __init__(self):
-        # Initialize cache directories
-        self.cache_dir = ".cache"
-        self.tiles_dir = os.path.join(self.cache_dir, "map_tiles")
-        self.landmarks_dir = os.path.join(self.cache_dir, "landmarks")
-        self.images_dir = os.path.join(self.cache_dir, "images")
+        # Initialize cache directories with absolute paths
+        self.cache_dir = os.path.abspath(".cache")
+        self.tiles_dir = os.path.abspath(os.path.join(self.cache_dir, "map_tiles"))
+        self.landmarks_dir = os.path.abspath(os.path.join(self.cache_dir, "landmarks"))
+        self.images_dir = os.path.abspath(os.path.join(self.cache_dir, "images"))
 
         # Create cache directories if they don't exist
         for directory in [self.cache_dir, self.tiles_dir, self.landmarks_dir, self.images_dir]:
-            os.makedirs(directory, exist_ok=True)
+            if not os.path.exists(directory):
+                os.makedirs(directory, exist_ok=True)
+                st.write(f"Debug - Created directory: {directory}")
 
-        # Initialize offline mode if not present
-        if 'offline_mode' not in st.session_state:
-            st.session_state.offline_mode = False
+        # Initialize cache stats in session state
+        if 'cache_stats' not in st.session_state:
+            st.session_state.cache_stats = {
+                'landmarks_cached': 0,
+                'images_cached': 0,
+                'last_update': None
+            }
+
+    def _cache_image(self, image_url: str) -> str:
+        """Download and cache an image, return absolute filename if successful"""
+        try:
+            # Generate filename from URL using MD5 hash
+            safe_hash = hashlib.md5(image_url.encode()).hexdigest()
+            filename = os.path.abspath(os.path.join(self.images_dir, f"{safe_hash}.jpg"))
+
+            st.write(f"Debug - Processing image URL: {image_url}")
+            st.write(f"Debug - Target cache path: {filename}")
+
+            # Check if file exists and is readable
+            if os.path.exists(filename):
+                try:
+                    # Verify file is readable
+                    with open(filename, 'rb') as f:
+                        f.read(1)
+                    st.write(f"Debug - Using existing cached file: {filename}")
+                    return filename
+                except Exception as e:
+                    st.write(f"Debug - Existing file not readable: {str(e)}")
+
+            # Download and save new image
+            response = requests.get(image_url, timeout=10)
+            if response.status_code == 200:
+                with open(filename, 'wb') as f:
+                    f.write(response.content)
+                st.write(f"Debug - Successfully cached new image: {filename}")
+                # Verify the file was written successfully
+                if os.path.exists(filename):
+                    return filename
+
+            st.write("Debug - Failed to save image")
+            return ""
+
+        except Exception as e:
+            st.write(f"Debug - Error in _cache_image: {str(e)}")
+            return ""
+
+    def cache_landmarks(self, landmarks: List[Dict], bounds: Tuple[float, float, float, float], language: str):
+        """Cache landmark data and associated images for offline use"""
+        try:
+            bounds_key = f"{language}_" + "_".join(str(round(b, 3)) for b in bounds)
+            cache_path = os.path.abspath(os.path.join(self.landmarks_dir, f"landmarks_{bounds_key}.json"))
+
+            st.write(f"Debug - Caching landmarks to: {cache_path}")
+
+            cached_landmarks = []
+            for landmark in landmarks:
+                cached_landmark = landmark.copy()
+
+                if 'image_url' in landmark and landmark['image_url']:
+                    st.write(f"Debug - Processing image for landmark: {landmark['title']}")
+                    cached_path = self._cache_image(landmark['image_url'])
+                    if cached_path:
+                        cached_landmark['image_url'] = cached_path
+                        st.write(f"Debug - Cached image path set to: {cached_path}")
+
+                cached_landmarks.append(cached_landmark)
+
+            # Save to cache file
+            with open(cache_path, 'w') as f:
+                json.dump({
+                    'landmarks': cached_landmarks,
+                    'timestamp': time.time(),
+                    'bounds': bounds,
+                    'language': language
+                }, f)
+
+            # Update cache stats
+            st.session_state.cache_stats['landmarks_cached'] = len(os.listdir(self.landmarks_dir))
+            st.session_state.cache_stats['images_cached'] = len(os.listdir(self.images_dir))
+            st.session_state.cache_stats['last_update'] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+            st.write(f"Debug - Successfully cached {len(cached_landmarks)} landmarks")
+
+        except Exception as e:
+            st.write(f"Debug - Error in cache_landmarks: {str(e)}")
 
     def get_tile_url(self, api_key: str) -> str:
         """Get appropriate tile URL based on mode"""
