@@ -10,13 +10,15 @@ import folium
 from PIL import Image
 from io import BytesIO
 import hashlib
-
-# Assume image_validator is defined elsewhere and imported correctly.  This is crucial.
-# Example: from image_validator import ImageValidator
-#          image_validator = ImageValidator()
+import logging
+from image_validator import image_validator
 
 class OfflineCacheManager:
     def __init__(self):
+        # Set up logging
+        logging.basicConfig(level=logging.INFO)
+        self.logger = logging.getLogger(__name__)
+
         # Initialize cache directories with absolute paths
         self.cache_dir = os.path.abspath(".cache")
         self.tiles_dir = os.path.abspath(os.path.join(self.cache_dir, "map_tiles"))
@@ -25,9 +27,13 @@ class OfflineCacheManager:
 
         # Create cache directories if they don't exist
         for directory in [self.cache_dir, self.tiles_dir, self.landmarks_dir, self.images_dir]:
-            if not os.path.exists(directory):
-                os.makedirs(directory, exist_ok=True)
-                st.write(f"Debug - Created directory: {directory}")
+            try:
+                if not os.path.exists(directory):
+                    os.makedirs(directory, exist_ok=True)
+                    self.logger.info(f"Created directory: {directory}")
+            except Exception as e:
+                self.logger.error(f"Failed to create directory {directory}: {str(e)}")
+                st.error(f"Cache directory creation failed: {str(e)}")
 
         # Initialize cache stats in session state
         if 'cache_stats' not in st.session_state:
@@ -44,13 +50,13 @@ class OfflineCacheManager:
             safe_hash = hashlib.md5(image_url.encode()).hexdigest()
             filename = os.path.abspath(os.path.join(self.images_dir, f"{safe_hash}.jpg"))
 
-            st.write(f"Debug - Processing image URL: {image_url}")
-            st.write(f"Debug - Target cache path: {filename}")
+            self.logger.info(f"Processing image URL: {image_url}")
+            self.logger.debug(f"Target cache path: {filename}")
 
             # Validate image URL first
             is_valid, error_msg = image_validator.validate_image_url(image_url)
             if not is_valid:
-                st.write(f"Debug - Invalid image URL: {error_msg}")
+                self.logger.warning(f"Invalid image URL: {error_msg}")
                 return ""
 
             # Check if file exists and is readable
@@ -59,34 +65,38 @@ class OfflineCacheManager:
                     # Verify file is readable and valid
                     is_valid, error_msg = image_validator.validate_image_file(filename)
                     if is_valid:
-                        st.write(f"Debug - Using existing cached file: {filename}")
+                        self.logger.info(f"Using existing cached file: {filename}")
                         return filename
                     else:
-                        st.write(f"Debug - Existing file invalid: {error_msg}")
+                        self.logger.warning(f"Existing file invalid: {error_msg}")
                 except Exception as e:
-                    st.write(f"Debug - Error reading existing file: {str(e)}")
+                    self.logger.error(f"Error reading existing file: {str(e)}")
 
             # Download and save new image
-            response = requests.get(image_url, timeout=10)
-            if response.status_code == 200:
-                with open(filename, 'wb') as f:
-                    f.write(response.content)
-                st.write(f"Debug - Successfully cached new image: {filename}")
+            try:
+                response = requests.get(image_url, timeout=10)
+                if response.status_code == 200:
+                    with open(filename, 'wb') as f:
+                        f.write(response.content)
+                    self.logger.info(f"Successfully cached new image: {filename}")
 
-                # Validate the newly cached file
-                is_valid, error_msg = image_validator.validate_image_file(filename)
-                if is_valid:
-                    return filename
+                    # Validate the newly cached file
+                    is_valid, error_msg = image_validator.validate_image_file(filename)
+                    if is_valid:
+                        return filename
+                    else:
+                        self.logger.warning(f"Newly cached file invalid: {error_msg}")
+                        os.remove(filename)  # Remove invalid file
+                        return ""
                 else:
-                    st.write(f"Debug - Newly cached file invalid: {error_msg}")
-                    os.remove(filename)  # Remove invalid file
-                    return ""
+                    self.logger.error(f"Failed to download image: HTTP {response.status_code}")
+            except requests.RequestException as e:
+                self.logger.error(f"Request failed for {image_url}: {str(e)}")
 
-            st.write("Debug - Failed to save image")
             return ""
 
         except Exception as e:
-            st.write(f"Debug - Error in _cache_image: {str(e)}")
+            self.logger.error(f"Error in _cache_image: {str(e)}")
             return ""
 
     def cache_landmarks(self, landmarks: List[Dict], bounds: Tuple[float, float, float, float], language: str):
@@ -95,39 +105,50 @@ class OfflineCacheManager:
             bounds_key = f"{language}_" + "_".join(str(round(b, 3)) for b in bounds)
             cache_path = os.path.abspath(os.path.join(self.landmarks_dir, f"landmarks_{bounds_key}.json"))
 
-            st.write(f"Debug - Caching landmarks to: {cache_path}")
+            self.logger.info(f"Caching landmarks to: {cache_path}")
 
             cached_landmarks = []
             for landmark in landmarks:
-                cached_landmark = landmark.copy()
+                try:
+                    cached_landmark = landmark.copy()
 
-                if 'image_url' in landmark and landmark['image_url']:
-                    st.write(f"Debug - Processing image for landmark: {landmark['title']}")
-                    cached_path = self._cache_image(landmark['image_url'])
-                    if cached_path:
-                        cached_landmark['image_url'] = cached_path
-                        st.write(f"Debug - Cached image path set to: {cached_path}")
+                    if 'image_url' in landmark and landmark['image_url']:
+                        self.logger.info(f"Processing image for landmark: {landmark['title']}")
+                        cached_path = self._cache_image(landmark['image_url'])
+                        if cached_path:
+                            cached_landmark['image_url'] = cached_path
+                            self.logger.debug(f"Cached image path set to: {cached_path}")
 
-                cached_landmarks.append(cached_landmark)
+                    cached_landmarks.append(cached_landmark)
+                except Exception as e:
+                    self.logger.error(f"Error processing landmark {landmark.get('title', 'unknown')}: {str(e)}")
 
             # Save to cache file
-            with open(cache_path, 'w') as f:
-                json.dump({
-                    'landmarks': cached_landmarks,
-                    'timestamp': time.time(),
-                    'bounds': bounds,
-                    'language': language
-                }, f)
+            try:
+                with open(cache_path, 'w') as f:
+                    json.dump({
+                        'landmarks': cached_landmarks,
+                        'timestamp': time.time(),
+                        'bounds': bounds,
+                        'language': language
+                    }, f)
+            except Exception as e:
+                self.logger.error(f"Failed to write cache file {cache_path}: {str(e)}")
+                raise
 
             # Update cache stats
-            st.session_state.cache_stats['landmarks_cached'] = len(os.listdir(self.landmarks_dir))
-            st.session_state.cache_stats['images_cached'] = len(os.listdir(self.images_dir))
-            st.session_state.cache_stats['last_update'] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            try:
+                st.session_state.cache_stats['landmarks_cached'] = len(os.listdir(self.landmarks_dir))
+                st.session_state.cache_stats['images_cached'] = len(os.listdir(self.images_dir))
+                st.session_state.cache_stats['last_update'] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            except Exception as e:
+                self.logger.error(f"Failed to update cache stats: {str(e)}")
 
-            st.write(f"Debug - Successfully cached {len(cached_landmarks)} landmarks")
+            self.logger.info(f"Successfully cached {len(cached_landmarks)} landmarks")
 
         except Exception as e:
-            st.write(f"Debug - Error in cache_landmarks: {str(e)}")
+            self.logger.error(f"Error in cache_landmarks: {str(e)}")
+            raise
 
     def get_tile_url(self, api_key: str) -> str:
         """Get appropriate tile URL based on mode"""

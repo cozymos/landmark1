@@ -11,6 +11,7 @@ from streamlit_folium import st_folium
 from google_places import GooglePlacesHandler
 from map_utils import create_base_map, draw_distance_circle, add_landmarks_to_map
 from cache_manager import get_landmarks, cache_manager
+from image_validator import image_validator  # Import the global instance
 import time
 from urllib.parse import quote, unquote
 import json
@@ -21,8 +22,6 @@ from recommender import LandmarkRecommender
 from weather_handler import WeatherHandler
 from coord_utils import parse_coordinates, format_dms
 from typing import Tuple, List, Dict
-#import image_validator #Assuming this import is needed
-
 
 # Update CSS for horizontal scrolling carousel
 st.markdown("""
@@ -364,21 +363,21 @@ if st.session_state.landmarks:
                 try:
                     # For cached files, validate and get appropriate path
                     if os.path.exists(image_path):
-                        is_valid, error_msg = image_validator.validate_image_file(image_path) #Assuming image_validator is defined elsewhere
+                        is_valid, error_msg = image_validator.validate_image_file(image_path)
                         if is_valid:
                             display_url = f"file://{image_path}"
                             st.write(f"Debug - Valid cached image: {display_url}")
                         else:
                             st.write(f"Debug - Invalid cached image: {error_msg}")
-                            display_url = image_validator.get_fallback_image(landmark_type) #Assuming image_validator is defined elsewhere
+                            display_url = image_validator.get_fallback_image(landmark_type)
                     else:
                         st.write(f"Debug - Image file not found")
-                        display_url = image_validator.get_fallback_image(landmark_type) #Assuming image_validator is defined elsewhere
+                        display_url = image_validator.get_fallback_image(landmark_type)
                 except Exception as e:
                     st.write(f"Debug - Error processing image: {str(e)}")
-                    display_url = image_validator.get_fallback_image(landmark_type) #Assuming image_validator is defined elsewhere
+                    display_url = image_validator.get_fallback_image(landmark_type)
             else:
-                display_url = image_validator.get_fallback_image(landmark_type) #Assuming image_validator is defined elsewhere
+                display_url = image_validator.get_fallback_image(landmark_type)
                 st.write(f"Debug - Using fallback image")
 
             st.markdown(f"""
