@@ -402,9 +402,10 @@ if st.session_state.landmarks:
         for landmark in recommendations:
             # Simple image HTML with cached path
             image_html = ""
-            if 'image_url' in landmark and os.path.exists(landmark['image_url']):
+            if 'image_url' in landmark and landmark['image_url']:
+                image_path = f"file://{landmark['image_url']}"
                 image_html = f"""
-                    <img src="file://{os.path.abspath(landmark['image_url'])}" 
+                    <img src="{image_path}" 
                          class="recommended-image" 
                          loading="lazy"
                          onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"

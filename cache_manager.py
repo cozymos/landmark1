@@ -35,6 +35,27 @@ class OfflineCacheManager:
             # Use Google Maps tiles when online
             return f"https://mt1.google.com/vt/lyrs=m&x={{x}}&y={{y}}&z={{z}}&key={api_key}"
 
+    def _cache_image(self, image_url: str) -> str:
+        """Download and cache an image, return filename if successful"""
+        try:
+            # Generate filename from URL
+            filename = os.path.join(self.images_dir, f"{hash(image_url)}.jpg")
+
+            # Skip if already cached
+            if os.path.exists(filename):
+                return filename
+
+            # Download and save image
+            response = requests.get(image_url)
+            if response.status_code == 200:
+                img = Image.open(BytesIO(response.content))
+                img.save(filename, 'JPEG')
+                return filename
+
+        except Exception as e:
+            st.warning(f"Failed to cache image: {str(e)}")
+        return None
+
     def cache_landmarks(self, landmarks: List[Dict], bounds: Tuple[float, float, float, float], language: str):
         """Cache landmark data and associated images for offline use"""
         bounds_key = f"{language}_" + "_".join(str(round(b, 3)) for b in bounds)
@@ -46,14 +67,15 @@ class OfflineCacheManager:
             for landmark in landmarks:
                 cached_landmark = landmark.copy()
 
-            # Always cache image if available and update image_url to cached path
-                if landmark.get('image_url'):
+                # Always cache image if available and update image_url to cached path
+                if 'image_url' in landmark and landmark['image_url']:
                     image_filename = self._cache_image(landmark['image_url'])
                     if image_filename:
-                        cached_landmark['image_url'] = image_filename
+                        cached_landmark['image_url'] = os.path.abspath(image_filename)
 
                 cached_landmarks.append(cached_landmark)
 
+            # Save to cache file
             with open(cache_path, 'w') as f:
                 json.dump({
                     'landmarks': cached_landmarks,
@@ -75,27 +97,6 @@ class OfflineCacheManager:
 
         except Exception as e:
             st.warning(f"Failed to cache landmarks: {str(e)}")
-
-    def _cache_image(self, image_url: str) -> str:
-        """Download and cache an image, return filename if successful"""
-        try:
-            # Generate filename from URL
-            filename = os.path.join(self.images_dir, f"{hash(image_url)}.jpg")
-
-            # Skip if already cached
-            if os.path.exists(filename):
-                return filename
-
-            # Download and save image
-            response = requests.get(image_url)
-            if response.status_code == 200:
-                img = Image.open(BytesIO(response.content))
-                img.save(filename, 'JPEG')
-                return filename
-
-        except Exception as e:
-            st.warning(f"Failed to cache image: {str(e)}")
-        return None
 
     def get_cached_landmarks(self, bounds: Tuple[float, float, float, float], language: str, max_age_hours: int = 24) -> List[Dict]:
         """Retrieve cached landmarks with smart bounds matching"""
