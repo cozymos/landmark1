@@ -28,12 +28,8 @@ class OfflineCacheManager:
 
     def get_tile_url(self, api_key: str) -> str:
         """Get appropriate tile URL based on mode"""
-        if st.session_state.offline_mode:
-            # Use OpenStreetMap tiles when offline (they support offline caching)
-            return "https://tile.openstreetmap.org/{z}/{x}/{y}.png"
-        else:
-            # Use Google Maps tiles when online
-            return f"https://mt1.google.com/vt/lyrs=m&x={{x}}&y={{y}}&z={{z}}&key={api_key}"
+        #Always use OpenStreetMap tiles
+        return "https://tile.openstreetmap.org/{z}/{x}/{y}.png"
 
     def cache_landmarks(self, landmarks: List[Dict], bounds: Tuple[float, float, float, float], language: str):
         """Cache landmark data and associated images for offline use"""
@@ -46,11 +42,12 @@ class OfflineCacheManager:
             for landmark in landmarks:
                 cached_landmark = landmark.copy()
 
-                # Cache image if available
+                # Always cache image if available
                 if landmark.get('image_url'):
                     image_filename = self._cache_image(landmark['image_url'])
                     if image_filename:
                         cached_landmark['cached_image'] = image_filename
+                        cached_landmark['image_url'] = image_filename  # Update the image_url to use cached path
 
                 cached_landmarks.append(cached_landmark)
 
@@ -112,16 +109,16 @@ class OfflineCacheManager:
                 with open(cache_path, 'r') as f:
                     cache_data = json.load(f)
 
-                # Check if cache is still valid and matches the requested language
-                age_hours = (time.time() - cache_data['timestamp']) / 3600
-                if age_hours <= max_age_hours and cache_data.get('language') == language:
-                    # Process cached landmarks
-                    landmarks = cache_data['landmarks']
-                    for landmark in landmarks:
-                        if 'cached_image' in landmark:
-                            # Use cached image path
-                            landmark['image_url'] = f"file://{landmark['cached_image']}"
-                    return landmarks
+            # Check if cache is still valid and matches the requested language
+            age_hours = (time.time() - cache_data['timestamp']) / 3600
+            if age_hours <= max_age_hours and cache_data.get('language') == language:
+                # Process cached landmarks
+                landmarks = cache_data['landmarks']
+                for landmark in landmarks:
+                    # Always use cached image if available
+                    if 'cached_image' in landmark:
+                        landmark['image_url'] = landmark['cached_image']
+                return landmarks
 
             return []
 
@@ -162,21 +159,16 @@ class OfflineCacheManager:
 # Initialize cache manager
 cache_manager = OfflineCacheManager()
 
-@st.cache_data(ttl=3600)
-def get_cached_landmarks(
+def get_landmarks(
     bounds: Tuple[float, float, float, float],
     zoom_level: int,
-    offline_mode: bool = False,
     language: str = 'en',
     data_source: str = 'Google Places'
 ) -> List[Dict]:
     """
-    Smart wrapper for landmark caching with offline support
+    Smart wrapper for landmark fetching and caching
     """
     try:
-        if offline_mode:
-            return cache_manager.get_cached_landmarks(bounds, language)
-
         # Only fetch new landmarks if zoom level is appropriate
         if zoom_level >= 8:  # Prevent fetching at very low zoom levels
             landmarks = []
@@ -195,10 +187,9 @@ def get_cached_landmarks(
                 cache_manager.cache_landmarks(landmarks, bounds, language)
 
             return landmarks
-        return []
+        else:
+            return cache_manager.get_cached_landmarks(bounds, language)
 
     except Exception as e:
         st.error(f"Error fetching landmarks: {str(e)}")
-        if offline_mode:
-            return cache_manager.get_cached_landmarks(bounds, language)
-        return []
+        return cache_manager.get_cached_landmarks(bounds, language)

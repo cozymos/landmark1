@@ -10,7 +10,7 @@ import folium
 from streamlit_folium import st_folium
 from google_places import GooglePlacesHandler
 from map_utils import create_base_map, draw_distance_circle, add_landmarks_to_map
-from cache_manager import get_cached_landmarks, cache_manager
+from cache_manager import get_landmarks, cache_manager
 import time
 from urllib.parse import quote, unquote
 import json
@@ -250,10 +250,9 @@ if st.session_state.offline_mode:
         if st.button("🔄 Update Cache"):
             # Force a cache update for current view
             if st.session_state.last_bounds:
-                landmarks = get_cached_landmarks(
+                landmarks = get_landmarks(
                     st.session_state.last_bounds,
                     st.session_state.zoom_level,
-                    offline_mode=False,  # Force online fetch
                     language=st.session_state.wiki_language,
                     data_source=st.session_state.last_data_source
                 )
@@ -367,12 +366,11 @@ try:
             if st.session_state.last_bounds is None or \
                any(abs(a - b) > zoom_factor * 0.1 for a, b in zip(new_bounds, st.session_state.last_bounds)):
                 try:
-                    landmarks = get_cached_landmarks(
+                    landmarks = get_landmarks(
                         new_bounds,
                         st.session_state.zoom_level,
-                        st.session_state.offline_mode,
-                        st.session_state.wiki_language,
-                        data_source
+                        language=st.session_state.wiki_language,
+                        data_source=st.session_state.last_data_source
                     )
                     if landmarks:
                         st.session_state.landmarks = landmarks
@@ -404,22 +402,15 @@ if st.session_state.landmarks:
         for landmark in recommendations:
             # Create image HTML with error handling
             image_html = ""
-            if landmark.get('cached_image'):
-                # Use cached image with file:// protocol
-                image_html = f"""
-                    <img src="file://{landmark['cached_image']}" 
-                         class="recommended-image" 
-                         loading="lazy"
-                         onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"
-                    >
-                    <div class="placeholder-image" style="display:none;">
-                        📍 No image available
-                    </div>
-                """
-            elif landmark.get('image_url'):
+            if 'image_url' in landmark:
                 try:
+                    # Use local file path for images
+                    image_path = landmark['image_url']
+                    if not image_path.startswith('file://'):
+                        image_path = f"file://{image_path}"
+
                     image_html = f"""
-                        <img src="{landmark['image_url']}" 
+                        <img src="{image_path}" 
                              class="recommended-image" 
                              loading="lazy"
                              onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"
@@ -432,13 +423,6 @@ if st.session_state.landmarks:
                     image_html = '<div class="placeholder-image">📍 No image available</div>'
             else:
                 image_html = '<div class="placeholder-image">📍 No image available</div>'
-
-            # Record interaction
-            st.session_state.recommender.record_interaction(
-                str(landmark['coordinates']),
-                landmark.get('type', 'landmark'),
-                landmark['distance']
-            )
 
             # Create carousel slide
             st.markdown(f"""
@@ -455,6 +439,13 @@ if st.session_state.landmarks:
                 </div>
             </div>
             """, unsafe_allow_html=True)
+
+            # Record interaction
+            st.session_state.recommender.record_interaction(
+                str(landmark['coordinates']),
+                landmark.get('type', 'landmark'),
+                landmark['distance']
+            )
 
         # Close carousel container
         st.markdown('</div>', unsafe_allow_html=True)
@@ -656,10 +647,9 @@ Data sourced from Google Places. Updates automatically as you explore the map.
 * 🔵 Blue markers: Lower relevance landmarks
 """)
 
-def get_cached_landmarks(
+def get_landmarks(
     bounds: Tuple[float, float, float, float],
     zoom_level: int,
-    offline_mode: bool = False,
     language: str = 'en',
     data_source: str = 'Google Places'
 ) -> List[Dict]:
@@ -668,7 +658,7 @@ def get_cached_landmarks(
     """
     try:
         # If we're offline, try to get cached data
-        if offline_mode:
+        if st.session_state.offline_mode:
             return cache_manager.get_cached_landmarks(bounds, language)
 
         # Only fetch new landmarks if zoom level is appropriate
@@ -691,6 +681,6 @@ def get_cached_landmarks(
 
     except Exception as e:
         st.error(f"Error fetching landmarks: {str(e)}")
-        if offline_mode:
+        if st.session_state.offline_mode:
             return cache_manager.get_cached_landmarks(bounds, language)
         return []
