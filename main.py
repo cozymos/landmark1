@@ -21,6 +21,8 @@ from recommender import LandmarkRecommender
 from weather_handler import WeatherHandler
 from coord_utils import parse_coordinates, format_dms
 from typing import Tuple, List, Dict
+#import image_validator #Assuming this import is needed
+
 
 # Update CSS for horizontal scrolling carousel
 st.markdown("""
@@ -349,34 +351,42 @@ if st.session_state.landmarks:
         st.markdown('<div class="carousel-container">', unsafe_allow_html=True)
 
         for landmark in recommendations:
-            # Simple image display using cached path
+            # Image validation and display logic
             image_path = landmark.get('image_url', '')
+            landmark_type = landmark.get('type', 'landmark')
 
             # Debug logging for image paths
             st.write(f"Debug - Processing landmark: {landmark['title']}")
             st.write(f"Debug - Raw image path: {image_path}")
 
-            # Check if the image file exists and is readable
-            if image_path and os.path.exists(image_path):
+            # Process and validate image
+            if image_path:
                 try:
-                    # Verify file is readable
-                    with open(image_path, 'rb') as f:
-                        f.read(1)
-                    display_url = f"file://{image_path}"
-                    st.write(f"Debug - Valid image path: {display_url}")
+                    # For cached files, validate and get appropriate path
+                    if os.path.exists(image_path):
+                        is_valid, error_msg = image_validator.validate_image_file(image_path) #Assuming image_validator is defined elsewhere
+                        if is_valid:
+                            display_url = f"file://{image_path}"
+                            st.write(f"Debug - Valid cached image: {display_url}")
+                        else:
+                            st.write(f"Debug - Invalid cached image: {error_msg}")
+                            display_url = image_validator.get_fallback_image(landmark_type) #Assuming image_validator is defined elsewhere
+                    else:
+                        st.write(f"Debug - Image file not found")
+                        display_url = image_validator.get_fallback_image(landmark_type) #Assuming image_validator is defined elsewhere
                 except Exception as e:
-                    st.write(f"Debug - Error reading image file: {str(e)}")
-                    display_url = 'https://via.placeholder.com/300x200?text=No+Image'
+                    st.write(f"Debug - Error processing image: {str(e)}")
+                    display_url = image_validator.get_fallback_image(landmark_type) #Assuming image_validator is defined elsewhere
             else:
-                display_url = 'https://via.placeholder.com/300x200?text=No+Image'
-                st.write(f"Debug - Using placeholder image")
+                display_url = image_validator.get_fallback_image(landmark_type) #Assuming image_validator is defined elsewhere
+                st.write(f"Debug - Using fallback image")
 
             st.markdown(f"""
             <div class="recommendation-card">
                 <img src="{display_url}" 
                      class="recommended-image"
                      alt="{landmark['title']}"
-                     onerror="this.src='https://via.placeholder.com/300x200?text=No+Image';">
+                     onerror="this.src='{image_validator.get_fallback_image(landmark_type)}';">
                 <div class="recommendation-title">{landmark['title']}</div>
                 <div class="recommendation-score">
                     <span style="color: #1e88e5;">Score: {landmark.get('personalized_score', 0):.2f}</span>

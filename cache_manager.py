@@ -11,6 +11,10 @@ from PIL import Image
 from io import BytesIO
 import hashlib
 
+# Assume image_validator is defined elsewhere and imported correctly.  This is crucial.
+# Example: from image_validator import ImageValidator
+#          image_validator = ImageValidator()
+
 class OfflineCacheManager:
     def __init__(self):
         # Initialize cache directories with absolute paths
@@ -43,16 +47,24 @@ class OfflineCacheManager:
             st.write(f"Debug - Processing image URL: {image_url}")
             st.write(f"Debug - Target cache path: {filename}")
 
+            # Validate image URL first
+            is_valid, error_msg = image_validator.validate_image_url(image_url)
+            if not is_valid:
+                st.write(f"Debug - Invalid image URL: {error_msg}")
+                return ""
+
             # Check if file exists and is readable
             if os.path.exists(filename):
                 try:
-                    # Verify file is readable
-                    with open(filename, 'rb') as f:
-                        f.read(1)
-                    st.write(f"Debug - Using existing cached file: {filename}")
-                    return filename
+                    # Verify file is readable and valid
+                    is_valid, error_msg = image_validator.validate_image_file(filename)
+                    if is_valid:
+                        st.write(f"Debug - Using existing cached file: {filename}")
+                        return filename
+                    else:
+                        st.write(f"Debug - Existing file invalid: {error_msg}")
                 except Exception as e:
-                    st.write(f"Debug - Existing file not readable: {str(e)}")
+                    st.write(f"Debug - Error reading existing file: {str(e)}")
 
             # Download and save new image
             response = requests.get(image_url, timeout=10)
@@ -60,9 +72,15 @@ class OfflineCacheManager:
                 with open(filename, 'wb') as f:
                     f.write(response.content)
                 st.write(f"Debug - Successfully cached new image: {filename}")
-                # Verify the file was written successfully
-                if os.path.exists(filename):
+
+                # Validate the newly cached file
+                is_valid, error_msg = image_validator.validate_image_file(filename)
+                if is_valid:
                     return filename
+                else:
+                    st.write(f"Debug - Newly cached file invalid: {error_msg}")
+                    os.remove(filename)  # Remove invalid file
+                    return ""
 
             st.write("Debug - Failed to save image")
             return ""
@@ -119,71 +137,6 @@ class OfflineCacheManager:
         else:
             # Use Google Maps tiles when online
             return f"https://mt1.google.com/vt/lyrs=m&x={{x}}&y={{y}}&z={{z}}&key={api_key}"
-
-    def _cache_image(self, image_url: str) -> str:
-        """Download and cache an image, return filename if successful"""
-        try:
-            # Generate filename from URL using a more reliable hash
-            safe_hash = hashlib.md5(image_url.encode()).hexdigest()
-            filename = os.path.join(self.images_dir, f"{safe_hash}.jpg")
-
-            # Debug logging
-            st.write(f"Debug - Caching image from URL: {image_url}")
-            st.write(f"Debug - Cache path: {filename}")
-
-            # Skip if already cached
-            if os.path.exists(filename):
-                st.write(f"Debug - Using existing cached file")
-                return os.path.abspath(filename)
-
-            # Download and save image
-            response = requests.get(image_url, timeout=10)
-            if response.status_code == 200:
-                with open(filename, 'wb') as f:
-                    f.write(response.content)
-                st.write(f"Debug - Successfully cached new image")
-                return os.path.abspath(filename)
-
-        except Exception as e:
-            st.write(f"Debug - Error caching image: {str(e)}")
-            return ""
-
-    def cache_landmarks(self, landmarks: List[Dict], bounds: Tuple[float, float, float, float], language: str):
-        """Cache landmark data and associated images for offline use"""
-        try:
-            bounds_key = f"{language}_" + "_".join(str(round(b, 3)) for b in bounds)
-            cache_path = os.path.join(self.landmarks_dir, f"landmarks_{bounds_key}.json")
-
-            # Debug logging
-            st.write(f"Debug - Caching landmarks to: {cache_path}")
-
-            cached_landmarks = []
-            for landmark in landmarks:
-                cached_landmark = landmark.copy()
-
-                # Cache image if available
-                if 'image_url' in landmark and landmark['image_url']:
-                    st.write(f"Debug - Processing image for landmark: {landmark['title']}")
-                    cached_path = self._cache_image(landmark['image_url'])
-                    if cached_path:
-                        cached_landmark['image_url'] = cached_path
-                        st.write(f"Debug - Cached image path: {cached_path}")
-
-                cached_landmarks.append(cached_landmark)
-
-            # Save to cache file
-            with open(cache_path, 'w') as f:
-                json.dump({
-                    'landmarks': cached_landmarks,
-                    'timestamp': time.time(),
-                    'bounds': bounds,
-                    'language': language
-                }, f)
-
-            st.write(f"Debug - Successfully cached {len(cached_landmarks)} landmarks")
-
-        except Exception as e:
-            st.write(f"Debug - Error in cache_landmarks: {str(e)}")
 
     def get_cached_landmarks(self, bounds: Tuple[float, float, float, float], language: str, max_age_hours: int = 24) -> List[Dict]:
         """Retrieve cached landmarks with smart bounds matching"""
