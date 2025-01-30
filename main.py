@@ -404,10 +404,22 @@ if st.session_state.landmarks:
         for landmark in recommendations:
             # Create image HTML with error handling
             image_html = ""
-            if landmark.get('image_url'):
+            if landmark.get('cached_image'):
+                # Use cached image with file:// protocol
+                image_html = f"""
+                    <img src="file://{landmark['cached_image']}" 
+                         class="recommended-image" 
+                         loading="lazy"
+                         onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"
+                    >
+                    <div class="placeholder-image" style="display:none;">
+                        📍 No image available
+                    </div>
+                """
+            elif landmark.get('image_url'):
                 try:
                     image_html = f"""
-                        <img src="{landmark["image_url"]}" 
+                        <img src="{landmark['image_url']}" 
                              class="recommended-image" 
                              loading="lazy"
                              onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"
