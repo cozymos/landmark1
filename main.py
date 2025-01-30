@@ -235,8 +235,6 @@ if st.sidebar.button("Go to Location"):
         # Update URL parameters
         st.query_params['center'] = f"{custom_lat},{custom_lon}"
         st.query_params['zoom'] = str(st.session_state.zoom_level)
-        # Clear the combined input
-        st.session_state.combined_coords = ""
     else:
         st.sidebar.error("Invalid coordinates. Latitude must be between -90 and 90, longitude between -180 and 180.")
 
