@@ -20,8 +20,8 @@ import os
 from recommender import LandmarkRecommender
 from weather_handler import WeatherHandler
 from coord_utils import parse_coordinates, format_dms
+from wiki_handler import WikiLandmarkFetcher
 from typing import Tuple, List, Dict
-
 
 # Update CSS for better horizontal scrolling and card layout
 st.markdown("""
@@ -106,7 +106,114 @@ st.markdown("""
     .sidebar .element-container {
         margin-bottom: 0.5rem;
     }
+        /* Custom navigation buttons */
+        .swiper-button-next, .swiper-button-prev {
+            color: #1e88e5;
+            background: white;
+            padding: 20px;
+            border-radius: 50%;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .swiper-button-next:after, .swiper-button-prev:after {
+            font-size: 20px;
+        }
 </style>
+""", unsafe_allow_html=True)
+
+# Add Swiper.js and custom CSS
+st.markdown("""
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swiper@8/swiper-bundle.min.css" />
+    <script src="https://cdn.jsdelivr.net/npm/swiper@8/swiper-bundle.min.js"></script>
+    <style>
+        .swiper {
+            width: 100%;
+            padding: 20px 0;
+        }
+        .swiper-slide {
+            width: 300px;
+            margin-right: 16px;
+        }
+        .recommended-image {
+            width: 300px;
+            height: 200px;
+            object-fit: cover;
+            border-radius: 10px;
+            margin-bottom: 8px;
+            transition: transform 0.2s;
+        }
+        .recommendation-card {
+            padding: 12px;
+            border-radius: 10px;
+            background-color: #f0f2f6;
+            width: 300px;
+            transition: transform 0.2s;
+            cursor: pointer;
+        }
+        .recommendation-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        .recommendation-title {
+            font-size: 16px;
+            font-weight: 500;
+            margin: 8px 0;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .recommendation-score {
+            font-size: 14px;
+            color: #555;
+            margin-bottom: 4px;
+        }
+        .placeholder-image {
+            width: 300px;
+            height: 200px;
+            background-color: #e0e0e0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 10px;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+        /* Make the map container take up more space */
+        .stfolium-container {
+            width: 100% !important;
+            margin-bottom: 24px;
+        }
+        /* Compact sidebar content */
+        .sidebar .element-container {
+            margin-bottom: 0.5rem;
+        }
+        /* Custom navigation buttons */
+        .swiper-button-next, .swiper-button-prev {
+            color: #1e88e5;
+            background: white;
+            padding: 20px;
+            border-radius: 50%;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .swiper-button-next:after, .swiper-button-prev:after {
+            font-size: 20px;
+        }
+    </style>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            new Swiper('.swiper', {
+                slidesPerView: 'auto',
+                spaceBetween: 16,
+                navigation: {
+                    nextEl: '.swiper-button-next',
+                    prevEl: '.swiper-button-prev',
+                },
+                pagination: {
+                    el: '.swiper-pagination',
+                    clickable: true,
+                },
+            });
+        });
+    </script>
 """, unsafe_allow_html=True)
 
 # Add debounce time to session state
@@ -314,15 +421,18 @@ if st.session_state.landmarks:
     recommendations = st.session_state.recommender.get_recommendations(
         st.session_state.landmarks,
         st.session_state.map_center,
-        top_n=10  # Show more recommendations in horizontal scroll
+        top_n=10
     )
 
     if recommendations:
-        # Start horizontal scroll container
-        st.markdown('<div class="horizontal-scroll">', unsafe_allow_html=True)
+        # Create Swiper container
+        st.markdown("""
+        <div class="swiper">
+            <div class="swiper-wrapper">
+        """, unsafe_allow_html=True)
 
         for landmark in recommendations:
-            # Create image HTML with error handling and loading state
+            # Create image HTML with error handling
             image_html = ""
             if landmark.get('image_url'):
                 try:
@@ -348,22 +458,30 @@ if st.session_state.landmarks:
                 landmark['distance']
             )
 
-            # Create recommendation card
+            # Create Swiper slide
             st.markdown(f"""
-            <div class="recommendation-card">
-                {image_html}
-                <div class="recommendation-title">{landmark['title']}</div>
-                <div class="recommendation-score">
-                    <span style="color: #1e88e5;">Score: {landmark.get('personalized_score', 0):.2f}</span>
-                </div>
-                <div class="recommendation-score">
-                    📍 {landmark['distance']:.1f}km away
+            <div class="swiper-slide">
+                <div class="recommendation-card">
+                    {image_html}
+                    <div class="recommendation-title">{landmark['title']}</div>
+                    <div class="recommendation-score">
+                        <span style="color: #1e88e5;">Score: {landmark.get('personalized_score', 0):.2f}</span>
+                    </div>
+                    <div class="recommendation-score">
+                        📍 {landmark['distance']:.1f}km away
+                    </div>
                 </div>
             </div>
             """, unsafe_allow_html=True)
 
-        # End horizontal scroll container
-        st.markdown('</div>', unsafe_allow_html=True)
+        # Add navigation and pagination
+        st.markdown("""
+            </div>
+            <div class="swiper-pagination"></div>
+            <div class="swiper-button-prev"></div>
+            <div class="swiper-button-next"></div>
+        </div>
+        """, unsafe_allow_html=True)
 
 
 # Move landmarks list to sidebar
