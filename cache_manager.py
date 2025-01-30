@@ -28,8 +28,12 @@ class OfflineCacheManager:
 
     def get_tile_url(self, api_key: str) -> str:
         """Get appropriate tile URL based on mode"""
-        #Always use OpenStreetMap tiles
-        return "https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+        if st.session_state.offline_mode:
+            # Use OpenStreetMap tiles when offline (they support offline caching)
+            return "https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+        else:
+            # Use Google Maps tiles when online
+            return f"https://mt1.google.com/vt/lyrs=m&x={{x}}&y={{y}}&z={{z}}&key={api_key}"
 
     def cache_landmarks(self, landmarks: List[Dict], bounds: Tuple[float, float, float, float], language: str):
         """Cache landmark data and associated images for offline use"""
