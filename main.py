@@ -1,4 +1,11 @@
+# Page config must come first
 import streamlit as st
+st.set_page_config(
+    page_title="Local Landmarks Explorer",
+    page_icon="🗺️",
+    layout="wide"
+)
+
 import folium
 from streamlit_folium import st_folium
 from google_places import GooglePlacesHandler
@@ -13,15 +20,79 @@ import os
 from recommender import LandmarkRecommender
 from weather_handler import WeatherHandler
 from coord_utils import parse_coordinates, format_dms
-from wiki_handler import WikiLandmarkFetcher  # Fixed import
+from wiki_handler import WikiLandmarkFetcher
+from typing import Tuple, List, Dict
 
 
-# Page config
-st.set_page_config(
-    page_title="Local Landmarks Explorer",
-    page_icon="🗺️",
-    layout="wide"
-)
+# Update CSS for horizontal scrolling
+st.markdown("""
+<style>
+    .recommended-image {
+        width: 250px;
+        height: 150px;
+        object-fit: cover;
+        border-radius: 10px;
+        margin-bottom: 4px;
+    }
+    .recommendation-card {
+        padding: 8px;
+        border-radius: 8px;
+        background-color: #f0f2f6;
+        margin: 4px;
+        width: 250px;
+        flex-shrink: 0;
+    }
+    .recommendation-title {
+        font-size: 14px;
+        font-weight: 500;
+        margin: 4px 0;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .recommendation-score {
+        font-size: 12px;
+        color: #555;
+    }
+    .placeholder-image {
+        width: 250px;
+        height: 150px;
+        background-color: #e0e0e0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 8px;
+        margin-bottom: 4px;
+        font-size: 14px;
+    }
+    .horizontal-scroll {
+        display: flex;
+        overflow-x: auto;
+        padding: 10px 0;
+        gap: 10px;
+    }
+    /* Hide scrollbar but keep functionality */
+    .horizontal-scroll::-webkit-scrollbar {
+        height: 6px;
+    }
+    .horizontal-scroll::-webkit-scrollbar-track {
+        background: #f0f2f6;
+        border-radius: 3px;
+    }
+    .horizontal-scroll::-webkit-scrollbar-thumb {
+        background: #888;
+        border-radius: 3px;
+    }
+    /* Make the map container take up more space */
+    .stfolium-container {
+        width: 100% !important;
+    }
+    /* Compact sidebar content */
+    .sidebar .element-container {
+        margin-bottom: 0.5rem;
+    }
+</style>
+""", unsafe_allow_html=True)
 
 # Add debounce time to session state
 if 'last_update_time' not in st.session_state:
@@ -64,60 +135,23 @@ if 'last_data_source' not in st.session_state:
     st.session_state.last_data_source = "Google Places"  # Set Google Places as default
 
 
-# Update the CSS section at the beginning of the file
-st.markdown("""
-<style>
-    .recommended-image {
-        width: 100%;
-        height: 150px;  /* Reduced height */
-        object-fit: cover;
-        border-radius: 10px;
-        margin-bottom: 4px;  /* Reduced margin */
-    }
-    .recommendation-card {
-        padding: 8px;  /* Reduced padding */
-        border-radius: 8px;
-        background-color: #f0f2f6;
-        margin: 4px;  /* Reduced margin */
-        height: 100%;
-    }
-    .recommendation-title {
-        font-size: 14px;  /* Smaller font */
-        font-weight: 500;
-        margin: 4px 0;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-    }
-    .recommendation-score {
-        font-size: 12px;  /* Smaller font */
-        color: #555;
-    }
-    .placeholder-image {
-        width: 100%;
-        height: 150px;  /* Match reduced height */
-        background-color: #e0e0e0;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        border-radius: 8px;
-        margin-bottom: 4px;
-        font-size: 14px;  /* Smaller font */
-    }
-    /* Make the map container take up more space */
-    .stfolium-container {
-        width: 100% !important;
-    }
-    /* Reduce padding in sidebar elements */
-    .streamlit-expanderHeader {
-        padding: 0.5rem !important;
-    }
-    /* Compact sidebar content */
-    .sidebar .element-container {
-        margin-bottom: 0.5rem;
-    }
-</style>
-""", unsafe_allow_html=True)
+# Helper function definition (moved up)
+def process_landmark_discovery(landmark):
+    """Process landmark discovery and handle animations"""
+    # Create unique ID for landmark
+    landmark_id = hashlib.md5(f"{landmark['title']}:{landmark['coordinates']}".encode()).hexdigest()
+
+    # Check if this is a new discovery
+    discovery_info = st.session_state.journey_tracker.add_discovery(landmark_id, landmark['title'])
+
+    if discovery_info["is_new"]:
+        # Show discovery animation
+        st.balloons()
+
+        # Show achievement notifications
+        for achievement in discovery_info.get("new_achievements", []):
+            st.success(f"🎉 Achievement Unlocked: {achievement.icon} {achievement.name}")
+            st.toast(f"New Achievement: {achievement.name}")
 
 # Title and description
 st.title("🗺️ Local Landmarks Explorer")
@@ -126,7 +160,7 @@ Explore landmarks in your area with information from Google Places.
 Pan and zoom the map to discover new locations!
 """)
 
-# Sidebar controls (moved up)
+# Sidebar controls
 st.sidebar.header("Map Controls")
 
 # Layer toggles
@@ -142,7 +176,7 @@ if offline_mode != st.session_state.offline_mode:
     else:
         st.sidebar.info("🌐 Online mode enabled. Fetching live data.")
 
-# Filters (moved up)
+# Filters
 st.sidebar.header("Filters")
 search_term = st.sidebar.text_input("Search landmarks", "")
 min_rating = st.sidebar.slider("Minimum relevance score", 0.0, 1.0, 0.3)
@@ -165,44 +199,47 @@ filtered_landmarks = [
 ]
 
 # Recommendations section
-st.markdown("### 🎯 Recommended Landmarks")
 if st.session_state.landmarks:
+    st.markdown("### 🎯 Recommended Landmarks")
     recommendations = st.session_state.recommender.get_recommendations(
         st.session_state.landmarks,
         st.session_state.map_center,
-        top_n=3
+        top_n=10  # Show more recommendations in horizontal scroll
     )
 
     if recommendations:
-        rec_cols = st.columns(len(recommendations))
-        for i, landmark in enumerate(recommendations):
-            with rec_cols[i]:
-                # Create image HTML with error handling
-                image_html = ""
-                if landmark.get('image_url'):
-                    try:
-                        image_html = f'<img src="{landmark["image_url"]}" class="recommended-image" onerror="this.style.display=\'none\'; this.nextElementSibling.style.display=\'flex\';">'
-                        image_html += '<div class="placeholder-image" style="display:none;">📍 No image available</div>'
-                    except Exception:
-                        image_html = '<div class="placeholder-image">📍 No image available</div>'
-                else:
+        st.markdown('<div class="horizontal-scroll">', unsafe_allow_html=True)
+        for landmark in recommendations:
+            # Create image HTML with error handling
+            image_html = ""
+            if landmark.get('image_url'):
+                try:
+                    image_html = f'<img src="{landmark["image_url"]}" class="recommended-image" onerror="this.style.display=\'none\'; this.nextElementSibling.style.display=\'flex\';">'
+                    image_html += '<div class="placeholder-image" style="display:none;">📍 No image available</div>'
+                except Exception:
                     image_html = '<div class="placeholder-image">📍 No image available</div>'
+            else:
+                image_html = '<div class="placeholder-image">📍 No image available</div>'
 
-                st.markdown(f"""
-                <div class="recommendation-card">
-                    {image_html}
-                    <div class="recommendation-title">{landmark['title']}</div>
-                    <div class="recommendation-score">Score: {landmark['personalized_score']:.2f}</div>
-                </div>
-                """, unsafe_allow_html=True)
+            # Record interaction
+            st.session_state.recommender.record_interaction(
+                str(landmark['coordinates']),
+                landmark.get('type', 'landmark'),
+                landmark['distance']
+            )
+
+            st.markdown(f"""
+            <div class="recommendation-card">
+                {image_html}
+                <div class="recommendation-title">{landmark['title']}</div>
+                <div class="recommendation-score">Score: {landmark.get('personalized_score', 0):.2f}</div>
+                <div class="recommendation-score">Distance: {landmark['distance']:.1f}km</div>
+            </div>
+            """, unsafe_allow_html=True)
+        st.markdown('</div>', unsafe_allow_html=True)
 
 
-
-# Display total landmarks count
-st.markdown(f"**Found {len(filtered_landmarks)} landmarks in this area**")
-
-
-# Create the main map - now taking most of the width
+# Create the main map
 try:
     # Get appropriate tile URL based on mode
     tile_url = cache_manager.get_tile_url(os.environ['GOOGLE_MAPS_API_KEY'])
@@ -294,6 +331,8 @@ try:
 except Exception as e:
     st.error(f"Error rendering map: {str(e)}")
 
+# Display total landmarks count
+st.markdown(f"**Found {len(filtered_landmarks)} landmarks in this area**")
 
 # Move landmarks list to sidebar
 st.sidebar.markdown("---")
@@ -482,7 +521,6 @@ if st.session_state.map_center:
         st.sidebar.warning("Unable to fetch weather data")
 
 
-
 # Footer
 st.markdown("---")
 st.markdown("""
@@ -492,25 +530,41 @@ Data sourced from Google Places. Updates automatically as you explore the map.
 * 🔵 Blue markers: Lower relevance landmarks
 """)
 
-def get_cached_landmarks(bounds, zoom_level, offline_mode, language, data_source): #added data_source parameter
+def get_cached_landmarks(
+    bounds: Tuple[float, float, float, float],
+    zoom_level: int,
+    offline_mode: bool = False,
+    language: str = 'en',
+    data_source: str = 'Google Places'
+) -> List[Dict]:
+    """
+    Fetch and cache landmarks for the given area
+    """
     try:
-        return cache_manager.cache_landmarks(bounds, zoom_level, offline_mode, language, data_source) #pass data source to cache_manager
-    except:
+        # If we're offline, try to get cached data
+        if offline_mode:
+            return cache_manager.get_cached_landmarks(bounds, language)
+
+        # Only fetch new landmarks if zoom level is appropriate
+        if zoom_level >= 8:  # Prevent fetching at very low zoom levels
+            landmarks = []
+
+            if data_source == "Wikipedia":
+                wiki_fetcher = WikiLandmarkFetcher()
+                landmarks = wiki_fetcher.get_landmarks(bounds)  # Language handled in class
+            else:  # Google Places
+                places_handler = GooglePlacesHandler()
+                landmarks = places_handler.get_landmarks(bounds)
+
+            # Cache the landmarks for offline use
+            if landmarks:
+                cache_manager.cache_landmarks(landmarks, bounds, language)
+
+            return landmarks
         return []
 
-def process_landmark_discovery(landmark):
-    """Process landmark discovery and handle animations"""
-    # Create unique ID for landmark
-    landmark_id = hashlib.md5(f"{landmark['title']}:{landmark['coordinates']}".encode()).hexdigest()
-
-    # Check if this is a new discovery
-    discovery_info = st.session_state.journey_tracker.add_discovery(landmark_id, landmark['title'])
-
-    if discovery_info["is_new"]:
-        # Show discovery animation
-        st.balloons()
-
-        # Show achievement notifications
-        for achievement in discovery_info.get("new_achievements", []):
-            st.success(f"🎉 Achievement Unlocked: {achievement.icon} {achievement.name}")
-            st.toast(f"New Achievement: {achievement.name}")
+    except Exception as e:
+        st.error(f"Error fetching landmarks: {str(e)}")
+        if offline_mode:
+            return cache_manager.get_cached_landmarks(bounds, language)
+        return []
