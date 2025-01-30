@@ -60,6 +60,8 @@ if 'offline_mode' not in st.session_state:
     st.session_state.offline_mode = False
 if 'wiki_language' not in st.session_state: #added for language selection
     st.session_state.wiki_language = "en" #default language
+if 'last_data_source' not in st.session_state:
+    st.session_state.last_data_source = "Google Places" #default data source
 
 
 # CSS styling for recommendations
@@ -167,29 +169,44 @@ if offline_mode != st.session_state.offline_mode:
         st.sidebar.info("🌐 Online mode enabled. Fetching live data.")
 
 
-# Language selector
+# Data source selector
 st.sidebar.markdown("---")
-st.sidebar.header("🌍 Language Settings")
-wiki_fetcher = WikiLandmarkFetcher()
-languages = wiki_fetcher.get_supported_languages()
-selected_language = st.sidebar.selectbox(
-    "Select Language",
-    options=list(languages.keys()),
-    format_func=lambda x: languages[x],
-    index=list(languages.keys()).index(st.session_state.wiki_language),
-    help="Choose the language for landmark information"
+st.sidebar.header("🗃️ Data Source")
+data_source = st.sidebar.radio(
+    "Choose Landmarks Data Source",
+    options=["Wikipedia", "Google Places"],
+    help="Select where to fetch landmark information from"
 )
 
-# Update language if changed
-if selected_language != st.session_state.wiki_language:
-    if wiki_fetcher.set_language(selected_language):
-        st.session_state.wiki_language = selected_language # Update session state
-        st.sidebar.success(f"Language changed to {languages[selected_language]}")
-        # Clear current landmarks to trigger refresh
-        st.session_state.landmarks = []
-    else:
-        st.sidebar.error("Failed to change language")
+if 'last_data_source' not in st.session_state:
+    st.session_state.last_data_source = data_source
+elif st.session_state.last_data_source != data_source:
+    st.session_state.last_data_source = data_source
+    st.session_state.landmarks = []  # Clear landmarks when switching source
+    st.sidebar.success(f"Switched to {data_source} data source")
 
+# Language selector (only show for Wikipedia source)
+if data_source == "Wikipedia":
+    st.sidebar.markdown("---")
+    st.sidebar.header("🌍 Language Settings")
+    wiki_fetcher = WikiLandmarkFetcher()
+    languages = wiki_fetcher.get_supported_languages()
+    selected_language = st.sidebar.selectbox(
+        "Select Language",
+        options=list(languages.keys()),
+        format_func=lambda x: languages[x],
+        index=list(languages.keys()).index(st.session_state.wiki_language),
+        help="Choose the language for landmark information"
+    )
+
+    # Update language if changed
+    if selected_language != st.session_state.wiki_language:
+        if wiki_fetcher.set_language(selected_language):
+            st.session_state.wiki_language = selected_language
+            st.sidebar.success(f"Language changed to {languages[selected_language]}")
+            st.session_state.landmarks = []
+        else:
+            st.sidebar.error("Failed to change language")
 
 # Filters
 st.sidebar.header("Filters")
@@ -392,7 +409,8 @@ with map_col:
                             new_bounds,
                             st.session_state.zoom_level,
                             st.session_state.offline_mode,
-                            st.session_state.wiki_language #pass language
+                            st.session_state.wiki_language,
+                            data_source
                         )
                         if landmarks:
                             st.session_state.landmarks = landmarks
@@ -470,8 +488,8 @@ Data sourced from Google Places. Updates automatically as you explore the map.
 * 🔵 Blue markers: Lower relevance landmarks
 """)
 
-def get_cached_landmarks(bounds, zoom_level, offline_mode, language): #added language parameter
+def get_cached_landmarks(bounds, zoom_level, offline_mode, language, data_source): #added data_source parameter
     try:
-        return cache_manager.cache_landmarks(bounds, zoom_level, offline_mode, language) #pass language to cache_manager
+        return cache_manager.cache_landmarks(bounds, zoom_level, offline_mode, language, data_source) #pass data source to cache_manager
     except:
         return []

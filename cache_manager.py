@@ -105,7 +105,8 @@ def get_cached_landmarks(
     bounds: Tuple[float, float, float, float],
     zoom_level: int,
     offline_mode: bool = False,
-    language: str = 'en'
+    language: str = 'en',
+    data_source: str = 'Wikipedia'
 ) -> List[Dict]:
     """
     Smart wrapper for landmark caching with offline support
@@ -116,9 +117,16 @@ def get_cached_landmarks(
 
         # Only fetch new landmarks if zoom level is appropriate
         if zoom_level >= 8:  # Prevent fetching at very low zoom levels
-            from wiki_handler import WikiLandmarkFetcher
-            wiki_fetcher = WikiLandmarkFetcher()
-            landmarks = wiki_fetcher.get_landmarks(bounds)  # No need to pass language as it's managed in the class
+            landmarks = []
+
+            if data_source == "Wikipedia":
+                from wiki_handler import WikiLandmarkFetcher
+                wiki_fetcher = WikiLandmarkFetcher()
+                landmarks = wiki_fetcher.get_landmarks(bounds)  # Language handled in class
+            else:  # Google Places
+                from google_places import GooglePlacesHandler
+                places_handler = GooglePlacesHandler()
+                landmarks = places_handler.get_landmarks(bounds)
 
             # Cache the landmarks for offline use
             if landmarks:
