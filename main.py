@@ -204,43 +204,26 @@ map_col, info_col = st.columns([2, 1])
 
 with map_col:
     try:
-        # Create base map with Google Maps tiles
-        if st.session_state.offline_mode:
-            m = folium.Map(
-                location=st.session_state.map_center,
-                zoom_start=st.session_state.zoom_level,
-                tiles=None,  # Don't load any tiles by default
-            )
-            # Add cached tile layer
-            folium.TileLayer(
-                tiles='http://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}',
-                attr='Google Maps',
-                name='Google Maps',
-                overlay=False,
-                control=True,
-                max_zoom=18,
-                tileurl_function=lambda x, y, z: cache_manager.cache_map_tile(
-                    f"https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}&key={os.environ['GOOGLE_MAPS_API_KEY']}",
-                    z, x, y
-                )
-            ).add_to(m)
-        else:
-            m = folium.Map(
-                location=st.session_state.map_center,
-                zoom_start=st.session_state.zoom_level,
-                tiles=f"https://mt1.google.com/vt/lyrs=m&x={{x}}&y={{y}}&z={{z}}&key={os.environ['GOOGLE_MAPS_API_KEY']}",
-                attr="Google Maps",
-                control_scale=True,
-                prefer_canvas=True
-            )
+        # Get appropriate tile URL based on mode
+        tile_url = cache_manager.get_tile_url(os.environ['GOOGLE_MAPS_API_KEY'])
 
-        # Add landmarks and distance circle only if we have data
+        # Create base map
+        m = folium.Map(
+            location=st.session_state.map_center,
+            zoom_start=st.session_state.zoom_level,
+            tiles=tile_url,
+            attr="Map data © OpenStreetMap contributors" if st.session_state.offline_mode else "Google Maps",
+            control_scale=True,
+            prefer_canvas=True
+        )
+
+        # Add landmarks and distance circle if we have data
         if st.session_state.landmarks:
             add_landmarks_to_map(m, st.session_state.landmarks, show_heatmap)
             if radius_km > 0:
                 draw_distance_circle(m, tuple(st.session_state.map_center), radius_km)
 
-        # Display map with minimal returned objects and reduced updates
+        # Display map with minimal returned objects
         map_data = st_folium(
             m,
             width=800,

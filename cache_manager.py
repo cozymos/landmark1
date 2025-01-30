@@ -4,7 +4,6 @@ import json
 import os
 import time
 from datetime import datetime, timedelta
-import base64
 import requests
 from functools import partial
 import folium
@@ -26,23 +25,14 @@ class OfflineCacheManager:
         if 'offline_mode' not in st.session_state:
             st.session_state.offline_mode = False
 
-    def cache_map_tile(self, url: str, zoom: int, x: int, y: int) -> str:
-        """Cache a map tile locally"""
-        tile_path = os.path.join(self.tiles_dir, f"tile_{zoom}_{x}_{y}.png")
-
-        if not os.path.exists(tile_path):
-            try:
-                response = requests.get(url)
-                response.raise_for_status()
-
-                # Save tile image
-                img = Image.open(BytesIO(response.content))
-                img.save(tile_path)
-            except Exception as e:
-                st.warning(f"Failed to cache tile: {str(e)}")
-                return url
-
-        return f"file://{tile_path}"
+    def get_tile_url(self, api_key: str) -> str:
+        """Get appropriate tile URL based on mode"""
+        if st.session_state.offline_mode:
+            # Use a static tile server that works offline
+            return "https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+        else:
+            # Use Google Maps tiles when online
+            return f"https://mt1.google.com/vt/lyrs=m&x={{x}}&y={{y}}&z={{z}}&key={api_key}"
 
     def cache_landmarks(self, landmarks: List[Dict], bounds: Tuple[float, float, float, float]):
         """Cache landmark data for offline use"""
@@ -100,12 +90,6 @@ class OfflineCacheManager:
             # Clear old landmark cache
             for cache_file in os.listdir(self.landmarks_dir):
                 cache_path = os.path.join(self.landmarks_dir, cache_file)
-                if os.path.getmtime(cache_path) < current_time - (max_age_hours * 3600):
-                    os.remove(cache_path)
-
-            # Clear old tile cache
-            for cache_file in os.listdir(self.tiles_dir):
-                cache_path = os.path.join(self.tiles_dir, cache_file)
                 if os.path.getmtime(cache_path) < current_time - (max_age_hours * 3600):
                     os.remove(cache_path)
 
