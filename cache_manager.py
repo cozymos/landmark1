@@ -43,18 +43,18 @@ class OfflineCacheManager:
 
             # Skip if already cached
             if os.path.exists(filename):
-                return filename
+                return os.path.abspath(filename)
 
             # Download and save image
             response = requests.get(image_url)
             if response.status_code == 200:
                 img = Image.open(BytesIO(response.content))
                 img.save(filename, 'JPEG')
-                return filename
+                return os.path.abspath(filename)
 
         except Exception as e:
             st.warning(f"Failed to cache image: {str(e)}")
-        return None
+            return ""
 
     def cache_landmarks(self, landmarks: List[Dict], bounds: Tuple[float, float, float, float], language: str):
         """Cache landmark data and associated images for offline use"""
@@ -69,9 +69,9 @@ class OfflineCacheManager:
 
                 # Always cache image if available and update image_url to cached path
                 if 'image_url' in landmark and landmark['image_url']:
-                    image_filename = self._cache_image(landmark['image_url'])
-                    if image_filename:
-                        cached_landmark['image_url'] = os.path.abspath(image_filename)
+                    cached_path = self._cache_image(landmark['image_url'])
+                    if cached_path:
+                        cached_landmark['image_url'] = cached_path
 
                 cached_landmarks.append(cached_landmark)
 

@@ -22,7 +22,7 @@ from weather_handler import WeatherHandler
 from coord_utils import parse_coordinates, format_dms
 from typing import Tuple, List, Dict
 
-# Update CSS for better carousel layout
+# Update CSS for horizontal scrolling carousel
 st.markdown("""
 <style>
     .recommended-image {
@@ -31,7 +31,6 @@ st.markdown("""
         object-fit: cover;
         border-radius: 10px;
         margin-bottom: 8px;
-        transition: transform 0.2s;
     }
     .recommendation-card {
         padding: 12px;
@@ -59,86 +58,36 @@ st.markdown("""
         color: #555;
         margin-bottom: 4px;
     }
-    .placeholder-image {
-        width: 300px;
-        height: 200px;
-        background-color: #e0e0e0;
+    .carousel-container {
         display: flex;
-        align-items: center;
-        justify-content: center;
-        border-radius: 10px;
-        margin-bottom: 8px;
-        font-size: 14px;
+        overflow-x: auto;
+        padding: 20px 0;
+        gap: 20px;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: thin;
+        scrollbar-color: #1E88E5 #F0F2F6;
+    }
+    .carousel-container::-webkit-scrollbar {
+        height: 8px;
+    }
+    .carousel-container::-webkit-scrollbar-track {
+        background: #F0F2F6;
+        border-radius: 4px;
+    }
+    .carousel-container::-webkit-scrollbar-thumb {
+        background-color: #1E88E5;
+        border-radius: 4px;
     }
     /* Make the map container take up more space */
     .stfolium-container {
         width: 100% !important;
-        margin-bottom: 24px;  /* Add space before recommendations */
+        margin-bottom: 24px;
     }
     /* Compact sidebar content */
     .sidebar .element-container {
         margin-bottom: 0.5rem;
     }
-    /* Slick carousel custom styling */
-    .slick-prev, .slick-next {
-        background: white;
-        border-radius: 50%;
-        width: 40px;
-        height: 40px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        z-index: 1;
-    }
-    .slick-prev:before, .slick-next:before {
-        color: #1e88e5;
-    }
-    .slick-track {
-        display: flex;
-        gap: 16px;
-    }
 </style>
-""", unsafe_allow_html=True)
-
-# Add Slick Carousel CDN and initialization
-st.markdown("""
-    <link rel="stylesheet" type="text/css" href="//cdn.jsdelivr.net/npm/slick-carousel@1.8.1/slick/slick.css"/>
-    <link rel="stylesheet" type="text/css" href="//cdn.jsdelivr.net/npm/slick-carousel@1.8.1/slick/slick-theme.css"/>
-    <script type="text/javascript" src="//code.jquery.com/jquery-1.11.0.min.js"></script>
-    <script type="text/javascript" src="//code.jquery.com/jquery-migrate-1.2.1.min.js"></script>
-    <script type="text/javascript" src="//cdn.jsdelivr.net/npm/slick-carousel@1.8.1/slick/slick.min.js"></script>
-    <script type="text/javascript">
-        $(document).ready(function(){
-            $('.recommendations-carousel').slick({
-                dots: true,
-                infinite: false,
-                speed: 300,
-                slidesToShow: 4,
-                slidesToScroll: 1,
-                responsive: [
-                    {
-                        breakpoint: 1024,
-                        settings: {
-                            slidesToShow: 3,
-                            slidesToScroll: 1
-                        }
-                    },
-                    {
-                        breakpoint: 768,
-                        settings: {
-                            slidesToShow: 2,
-                            slidesToScroll: 1
-                        }
-                    },
-                    {
-                        breakpoint: 480,
-                        settings: {
-                            slidesToShow: 1,
-                            slidesToScroll: 1
-                        }
-                    }
-                ]
-            });
-        });
-    </script>
 """, unsafe_allow_html=True)
 
 # Add debounce time to session state
@@ -396,52 +345,30 @@ if st.session_state.landmarks:
     )
 
     if recommendations:
-        # Create Slick carousel container
-        st.markdown('<div class="recommendations-carousel">', unsafe_allow_html=True)
+        # Create horizontal scrolling container
+        st.markdown('<div class="carousel-container">', unsafe_allow_html=True)
 
         for landmark in recommendations:
-            # Simple image HTML with cached path
-            image_html = ""
-            if 'image_url' in landmark and landmark['image_url']:
-                image_path = f"file://{landmark['image_url']}"
-                image_html = f"""
-                    <img src="{image_path}" 
-                         class="recommended-image" 
-                         loading="lazy"
-                         onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"
-                         alt="{landmark['title']}"
-                    >
-                    <div class="placeholder-image" style="display:none;">
-                        📍 No image available
-                    </div>
-                """
-            else:
-                image_html = '<div class="placeholder-image">📍 No image available</div>'
+            # Simple image display using cached path
+            image_path = landmark.get('image_url', '')
 
-            # Create carousel slide
             st.markdown(f"""
-            <div>
-                <div class="recommendation-card">
-                    {image_html}
-                    <div class="recommendation-title">{landmark['title']}</div>
-                    <div class="recommendation-score">
-                        <span style="color: #1e88e5;">Score: {landmark.get('personalized_score', 0):.2f}</span>
-                    </div>
-                    <div class="recommendation-score">
-                        📍 {landmark['distance']:.1f}km away
-                    </div>
+            <div class="recommendation-card">
+                <img src="file://{image_path}" 
+                     class="recommended-image"
+                     alt="{landmark['title']}"
+                     onerror="this.src='https://via.placeholder.com/300x200?text=No+Image';">
+                <div class="recommendation-title">{landmark['title']}</div>
+                <div class="recommendation-score">
+                    <span style="color: #1e88e5;">Score: {landmark.get('personalized_score', 0):.2f}</span>
+                </div>
+                <div class="recommendation-score">
+                    📍 {landmark['distance']:.1f}km away
                 </div>
             </div>
             """, unsafe_allow_html=True)
 
-            # Record interaction
-            st.session_state.recommender.record_interaction(
-                str(landmark['coordinates']),
-                landmark.get('type', 'landmark'),
-                landmark['distance']
-            )
-
-        # Close carousel container
+        # Close container
         st.markdown('</div>', unsafe_allow_html=True)
 
 
