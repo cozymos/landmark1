@@ -12,6 +12,7 @@ import hashlib
 import os
 from recommender import LandmarkRecommender
 from weather_handler import WeatherHandler
+from coord_utils import parse_coordinates, format_dms
 
 # Page config
 st.set_page_config(
@@ -169,15 +170,50 @@ radius_km = st.sidebar.number_input("Show distance circle (km)", min_value=0.0, 
 
 # Custom location
 st.sidebar.header("Custom Location")
-custom_lat = st.sidebar.number_input("Latitude", value=st.session_state.map_center[0], format="%.4f")
-custom_lon = st.sidebar.number_input("Longitude", value=st.session_state.map_center[1], format="%.4f")
+
+# Add combined coordinates input
+combined_coords = st.sidebar.text_input(
+    "Enter Coordinates",
+    help="Enter coordinates in either format:\n" +
+         "• Decimal Degrees (DD): 37.3349, -122.0090\n" +
+         "• DMS: 37°20'5.64\"N, 122°0'32.40\"W",
+    placeholder="Enter coordinates (DD or DMS)"
+)
+
+if combined_coords:
+    coords = parse_coordinates(combined_coords)
+    if coords:
+        custom_lat = coords.lat
+        custom_lon = coords.lon
+        st.sidebar.success(f"""
+        ✅ Valid coordinates:
+        • DD: {custom_lat:.4f}, {custom_lon:.4f}
+        • DMS: {format_dms(custom_lat, True)}, {format_dms(custom_lon, False)}
+        """)
+    else:
+        st.sidebar.error("Invalid coordinate format. Please use DD or DMS format.")
+else:
+    # Separate lat/lon inputs as fallback
+    custom_lat = st.sidebar.number_input("Latitude", 
+        value=st.session_state.map_center[0], 
+        format="%.4f",
+        help="Decimal degrees (e.g., 37.3349)"
+    )
+    custom_lon = st.sidebar.number_input("Longitude", 
+        value=st.session_state.map_center[1], 
+        format="%.4f",
+        help="Decimal degrees (e.g., -122.0090)"
+    )
 
 if st.sidebar.button("Go to Location"):
-    st.session_state.map_center = [custom_lat, custom_lon]
-    st.session_state.zoom_level = 12
-    # Update URL parameters
-    st.query_params['center'] = f"{custom_lat},{custom_lon}"
-    st.query_params['zoom'] = str(st.session_state.zoom_level)
+    if -90 <= custom_lat <= 90 and -180 <= custom_lon <= 180:
+        st.session_state.map_center = [custom_lat, custom_lon]
+        st.session_state.zoom_level = 12
+        # Update URL parameters
+        st.query_params['center'] = f"{custom_lat},{custom_lon}"
+        st.query_params['zoom'] = str(st.session_state.zoom_level)
+    else:
+        st.sidebar.error("Invalid coordinates. Latitude must be between -90 and 90, longitude between -180 and 180.")
 
 # Journey Progress
 st.sidebar.markdown("---")
