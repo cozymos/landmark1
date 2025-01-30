@@ -3,7 +3,7 @@ import folium
 from streamlit_folium import st_folium
 from google_places import GooglePlacesHandler
 from map_utils import create_base_map, draw_distance_circle, add_landmarks_to_map
-from cache_manager import get_cached_landmarks
+from cache_manager import get_cached_landmarks, cache_manager
 import time
 from urllib.parse import quote, unquote
 import json
@@ -53,6 +53,8 @@ if 'recommender' not in st.session_state:
     st.session_state.recommender = LandmarkRecommender()
 if 'weather_handler' not in st.session_state:
     st.session_state.weather_handler = WeatherHandler()
+if 'offline_mode' not in st.session_state:
+    st.session_state.offline_mode = False
 
 # CSS styling for recommendations
 st.markdown("""
@@ -126,6 +128,16 @@ st.sidebar.header("Map Controls")
 show_heatmap = st.sidebar.checkbox("Show Heatmap", value=st.session_state.show_heatmap)
 st.session_state.show_heatmap = show_heatmap
 
+# Offline Mode Toggle
+offline_mode = st.sidebar.checkbox("📱 Offline Mode", value=st.session_state.offline_mode)
+if offline_mode != st.session_state.offline_mode:
+    st.session_state.offline_mode = offline_mode
+    if offline_mode:
+        st.sidebar.info("🔄 Offline mode enabled. Using cached map data.")
+    else:
+        st.sidebar.info("🌐 Online mode enabled. Fetching live data.")
+
+
 # Filters
 st.sidebar.header("Filters")
 search_term = st.sidebar.text_input("Search landmarks", "")
@@ -193,14 +205,34 @@ map_col, info_col = st.columns([2, 1])
 with map_col:
     try:
         # Create base map with Google Maps tiles
-        m = folium.Map(
-            location=st.session_state.map_center,
-            zoom_start=st.session_state.zoom_level,
-            tiles=f"https://mt1.google.com/vt/lyrs=m&x={{x}}&y={{y}}&z={{z}}&key={os.environ['GOOGLE_MAPS_API_KEY']}",
-            attr="Google Maps",
-            control_scale=True,
-            prefer_canvas=True
-        )
+        if st.session_state.offline_mode:
+            m = folium.Map(
+                location=st.session_state.map_center,
+                zoom_start=st.session_state.zoom_level,
+                tiles=None,  # Don't load any tiles by default
+            )
+            # Add cached tile layer
+            folium.TileLayer(
+                tiles='http://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}',
+                attr='Google Maps',
+                name='Google Maps',
+                overlay=False,
+                control=True,
+                max_zoom=18,
+                tileurl_function=lambda x, y, z: cache_manager.cache_map_tile(
+                    f"https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}&key={os.environ['GOOGLE_MAPS_API_KEY']}",
+                    z, x, y
+                )
+            ).add_to(m)
+        else:
+            m = folium.Map(
+                location=st.session_state.map_center,
+                zoom_start=st.session_state.zoom_level,
+                tiles=f"https://mt1.google.com/vt/lyrs=m&x={{x}}&y={{y}}&z={{z}}&key={os.environ['GOOGLE_MAPS_API_KEY']}",
+                attr="Google Maps",
+                control_scale=True,
+                prefer_canvas=True
+            )
 
         # Add landmarks and distance circle only if we have data
         if st.session_state.landmarks:
@@ -261,7 +293,11 @@ with map_col:
                 if st.session_state.last_bounds is None or \
                    any(abs(a - b) > zoom_factor * 0.1 for a, b in zip(new_bounds, st.session_state.last_bounds)):
                     try:
-                        landmarks = get_cached_landmarks(new_bounds, st.session_state.zoom_level)
+                        landmarks = get_cached_landmarks(
+                            new_bounds,
+                            st.session_state.zoom_level,
+                            st.session_state.offline_mode
+                        )
                         if landmarks:
                             st.session_state.landmarks = landmarks
                             st.session_state.last_bounds = new_bounds
@@ -335,9 +371,8 @@ Data sourced from Google Places. Updates automatically as you explore the map.
 * 🔵 Blue markers: Lower relevance landmarks
 """)
 
-def get_cached_landmarks(bounds, zoom_level):
-    # Placeholder - Replace with actual caching logic using bounds and zoom level
+def get_cached_landmarks(bounds, zoom_level, offline_mode):
     try:
-        return cache_landmarks(bounds)
+        return cache_manager.cache_landmarks(bounds, zoom_level, offline_mode)
     except:
         return []
