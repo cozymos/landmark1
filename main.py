@@ -223,6 +223,45 @@ if offline_mode != st.session_state.offline_mode:
     else:
         st.sidebar.info("🌐 Online mode enabled. Fetching live data.")
 
+# Add cache management controls
+if st.session_state.offline_mode:
+    st.sidebar.markdown("---")
+    st.sidebar.header("📦 Cache Management")
+
+    # Display cache statistics
+    cache_stats = cache_manager.get_cache_stats()
+    st.sidebar.markdown(f"""
+    **Cache Statistics:**
+    - 📍 Landmarks: {cache_stats['landmarks_cached']}
+    - 🖼️ Images: {cache_stats['images_cached']}
+    - 🕒 Last Update: {cache_stats['last_update'] or 'Never'}
+    """)
+
+    # Cache management buttons
+    col1, col2 = st.sidebar.columns(2)
+    with col1:
+        if st.button("🔄 Update Cache"):
+            # Force a cache update for current view
+            if st.session_state.last_bounds:
+                landmarks = get_cached_landmarks(
+                    st.session_state.last_bounds,
+                    st.session_state.zoom_level,
+                    offline_mode=False,  # Force online fetch
+                    language=st.session_state.wiki_language,
+                    data_source=st.session_state.last_data_source
+                )
+                if landmarks:
+                    st.session_state.landmarks = landmarks
+                    st.success("Cache updated successfully!")
+                else:
+                    st.error("Failed to update cache. Please check your internet connection.")
+
+    with col2:
+        if st.button("🗑️ Clear Old Cache"):
+            cache_manager.clear_old_cache()
+            st.success("Old cache cleared successfully!")
+
+
 # Filters
 st.sidebar.header("Filters")
 search_term = st.sidebar.text_input("Search landmarks", "")
@@ -292,8 +331,8 @@ try:
             # Check if center changed significantly
             if abs(new_lat - st.session_state.map_center[0]) > 0.001 or \
                abs(new_lng - st.session_state.map_center[1]) > 0.001:
-                st.session_state.map_center = [new_lat, new_lng]
-                updates_needed = True
+               st.session_state.map_center = [new_lat, new_lng]
+               updates_needed = True
 
         # Update zoom if changed
         if new_zoom is not None and new_zoom != st.session_state.zoom_level:
