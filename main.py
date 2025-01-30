@@ -312,6 +312,31 @@ if progress["next_achievement"]:
     st.sidebar.caption(next_achievement.description)
     st.sidebar.progress(min(total_discovered / next_achievement.requirement, 1.0))
 
+# Add this after the Journey Progress section in the sidebar
+st.sidebar.markdown("---")
+st.sidebar.header("📊 Travel Insights")
+
+# Get travel insights
+travel_insights = st.session_state.recommender.get_travel_insights()
+
+# Display insights with emojis and formatting
+if travel_insights['avg_distance'] is not None:
+    st.sidebar.markdown(f"""
+    🕒 Favorite Time: {travel_insights['favorite_time'].title()}
+    🌞 Preferred Season: {travel_insights['preferred_season'].title()}
+    📍 Average Distance: {travel_insights['avg_distance']:.1f} km
+    📅 Usually Visits: {travel_insights['preferred_day_type'].title()}s
+    """)
+
+    # Show top categories
+    st.sidebar.markdown("**Top Categories:**")
+    for category, weight in travel_insights['frequent_categories']:
+        st.sidebar.markdown(f"🏷️ {category.replace('_', ' ').title()}")
+
+    # Show exploration statistics
+    st.sidebar.markdown(f"🗺️ Explored Areas: {travel_insights['num_clusters']}")
+
+
 st.sidebar.markdown("---")
 st.sidebar.header("📍 Local Weather")
 if st.session_state.map_center:
