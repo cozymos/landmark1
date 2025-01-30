@@ -82,6 +82,16 @@ st.markdown("""
         font-size: 14px;
         color: #555;
     }
+    .placeholder-image {
+        width: 100%;
+        height: 200px;
+        background-color: #e0e0e0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 10px;
+        margin-bottom: 8px;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -104,13 +114,25 @@ if st.session_state.landmarks:
         rec_cols = st.columns(len(recommendations))
         for i, landmark in enumerate(recommendations):
             with rec_cols[i]:
+                # Create image HTML with error handling
+                image_html = ""
+                if landmark.get('image_url'):
+                    try:
+                        image_html = f'<img src="{landmark["image_url"]}" class="recommended-image" onerror="this.style.display=\'none\'; this.nextElementSibling.style.display=\'flex\';">'
+                        image_html += '<div class="placeholder-image" style="display:none;">📍 No image available</div>'
+                    except Exception:
+                        image_html = '<div class="placeholder-image">📍 No image available</div>'
+                else:
+                    image_html = '<div class="placeholder-image">📍 No image available</div>'
+
                 st.markdown(f"""
                 <div class="recommendation-card">
-                    {f'<img src="{landmark["image_url"]}" class="recommended-image">' if landmark.get('image_url') else ''}
+                    {image_html}
                     <div class="recommendation-title">{landmark['title']}</div>
                     <div class="recommendation-score">Score: {landmark['personalized_score']:.2f}</div>
                 </div>
                 """, unsafe_allow_html=True)
+
                 if st.button("👍 Favorite", key=f"fav_{i}_{landmark['title']}"):
                     is_favorite = st.session_state.recommender.toggle_favorite(
                         str(landmark['coordinates'])
