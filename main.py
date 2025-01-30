@@ -20,7 +20,6 @@ import os
 from recommender import LandmarkRecommender
 from weather_handler import WeatherHandler
 from coord_utils import parse_coordinates, format_dms
-from wiki_handler import WikiLandmarkFetcher
 from typing import Tuple, List, Dict
 
 # Update CSS for better carousel layout
@@ -263,9 +262,11 @@ try:
 
     # Add landmarks and distance circle if we have data
     if st.session_state.landmarks:
-        add_landmarks_to_map(m, st.session_state.landmarks, show_heatmap)
+        add_landmarks_to_map(m, filtered_landmarks, show_heatmap)
         if radius_km > 0:
-            draw_distance_circle(m, tuple(st.session_state.map_center), radius_km)
+            # Ensure center is passed as a proper tuple of two floats
+            center = (float(st.session_state.map_center[0]), float(st.session_state.map_center[1]))
+            draw_distance_circle(m, center, radius_km)
 
     # Display map with minimal returned objects
     map_data = st_folium(
