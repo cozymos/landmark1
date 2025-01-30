@@ -400,31 +400,20 @@ if st.session_state.landmarks:
         st.markdown('<div class="recommendations-carousel">', unsafe_allow_html=True)
 
         for landmark in recommendations:
-            # Create image HTML with error handling
+            # Simple image HTML with cached path
             image_html = ""
-            if 'image_url' in landmark:
-                try:
-                    # Get the image URL or cached path
-                    image_path = landmark['image_url']
-
-                    # If it's a cached image, ensure proper file:// protocol
-                    if os.path.exists(image_path):
-                        image_path = f"file://{os.path.abspath(image_path)}"
-
-                    image_html = f"""
-                        <img src="{image_path}" 
-                             class="recommended-image" 
-                             loading="lazy"
-                             onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"
-                             alt="{landmark['title']}"
-                        >
-                        <div class="placeholder-image" style="display:none;">
-                            📍 No image available
-                        </div>
-                    """
-                except Exception as e:
-                    st.error(f"Error loading image: {str(e)}")
-                    image_html = '<div class="placeholder-image">📍 No image available</div>'
+            if 'image_url' in landmark and os.path.exists(landmark['image_url']):
+                image_html = f"""
+                    <img src="file://{os.path.abspath(landmark['image_url'])}" 
+                         class="recommended-image" 
+                         loading="lazy"
+                         onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"
+                         alt="{landmark['title']}"
+                    >
+                    <div class="placeholder-image" style="display:none;">
+                        📍 No image available
+                    </div>
+                """
             else:
                 image_html = '<div class="placeholder-image">📍 No image available</div>'
 

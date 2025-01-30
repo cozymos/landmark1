@@ -46,12 +46,11 @@ class OfflineCacheManager:
             for landmark in landmarks:
                 cached_landmark = landmark.copy()
 
-                # Always cache image if available
+            # Always cache image if available and update image_url to cached path
                 if landmark.get('image_url'):
                     image_filename = self._cache_image(landmark['image_url'])
                     if image_filename:
-                        cached_landmark['cached_image'] = image_filename
-                        cached_landmark['image_url'] = image_filename  # Update the image_url to use cached path
+                        cached_landmark['image_url'] = image_filename
 
                 cached_landmarks.append(cached_landmark)
 
@@ -64,6 +63,12 @@ class OfflineCacheManager:
                 }, f)
 
             # Update cache stats
+            if 'cache_stats' not in st.session_state:
+                st.session_state.cache_stats = {
+                    'landmarks_cached': 0,
+                    'images_cached': 0,
+                    'last_update': None
+                }
             st.session_state.cache_stats['landmarks_cached'] = len(os.listdir(self.landmarks_dir))
             st.session_state.cache_stats['images_cached'] = len(os.listdir(self.images_dir))
             st.session_state.cache_stats['last_update'] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
