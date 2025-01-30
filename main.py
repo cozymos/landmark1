@@ -11,6 +11,7 @@ from journey_tracker import JourneyTracker
 import hashlib
 import os
 from recommender import LandmarkRecommender
+from weather_handler import WeatherHandler
 
 # Page config
 st.set_page_config(
@@ -50,6 +51,8 @@ if 'journey_tracker' not in st.session_state:
     st.session_state.journey_tracker = JourneyTracker()
 if 'recommender' not in st.session_state:
     st.session_state.recommender = LandmarkRecommender()
+if 'weather_handler' not in st.session_state:
+    st.session_state.weather_handler = WeatherHandler()
 
 # CSS styling for recommendations
 st.markdown("""
@@ -167,6 +170,22 @@ if progress["next_achievement"]:
     st.sidebar.markdown(f"{next_achievement.icon} **{next_achievement.name}**")
     st.sidebar.caption(next_achievement.description)
     st.sidebar.progress(min(total_discovered / next_achievement.requirement, 1.0))
+
+st.sidebar.markdown("---")
+st.sidebar.header("📍 Local Weather")
+if st.session_state.map_center:
+    weather_data = st.session_state.weather_handler.get_weather(
+        st.session_state.map_center[0],
+        st.session_state.map_center[1]
+    )
+    if weather_data:
+        st.sidebar.markdown(
+            st.session_state.weather_handler.format_weather_html(weather_data),
+            unsafe_allow_html=True
+        )
+    else:
+        st.sidebar.warning("Unable to fetch weather data")
+
 
 # Main map container
 map_col, info_col = st.columns([2, 1])
