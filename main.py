@@ -20,72 +20,87 @@ import os
 from recommender import LandmarkRecommender
 from weather_handler import WeatherHandler
 from coord_utils import parse_coordinates, format_dms
-from wiki_handler import WikiLandmarkFetcher
 from typing import Tuple, List, Dict
 
 
-# Update CSS for horizontal scrolling
+# Update CSS for better horizontal scrolling and card layout
 st.markdown("""
 <style>
     .recommended-image {
-        width: 250px;
-        height: 150px;
+        width: 300px;
+        height: 200px;
         object-fit: cover;
         border-radius: 10px;
-        margin-bottom: 4px;
+        margin-bottom: 8px;
+        transition: transform 0.2s;
     }
     .recommendation-card {
-        padding: 8px;
-        border-radius: 8px;
+        padding: 12px;
+        border-radius: 10px;
         background-color: #f0f2f6;
-        margin: 4px;
-        width: 250px;
+        margin: 8px;
+        width: 300px;
         flex-shrink: 0;
+        transition: transform 0.2s;
+        cursor: pointer;
+    }
+    .recommendation-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
     }
     .recommendation-title {
-        font-size: 14px;
+        font-size: 16px;
         font-weight: 500;
-        margin: 4px 0;
+        margin: 8px 0;
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
     }
     .recommendation-score {
-        font-size: 12px;
+        font-size: 14px;
         color: #555;
+        margin-bottom: 4px;
     }
     .placeholder-image {
-        width: 250px;
-        height: 150px;
+        width: 300px;
+        height: 200px;
         background-color: #e0e0e0;
         display: flex;
         align-items: center;
         justify-content: center;
-        border-radius: 8px;
-        margin-bottom: 4px;
+        border-radius: 10px;
+        margin-bottom: 8px;
         font-size: 14px;
     }
     .horizontal-scroll {
         display: flex;
         overflow-x: auto;
-        padding: 10px 0;
-        gap: 10px;
+        padding: 20px 0;
+        gap: 16px;
+        scroll-behavior: smooth;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: thin;
+        margin: 0 -16px;
+        padding: 16px;
     }
-    /* Hide scrollbar but keep functionality */
     .horizontal-scroll::-webkit-scrollbar {
-        height: 6px;
+        height: 8px;
     }
     .horizontal-scroll::-webkit-scrollbar-track {
         background: #f0f2f6;
-        border-radius: 3px;
+        border-radius: 4px;
     }
     .horizontal-scroll::-webkit-scrollbar-thumb {
         background: #888;
-        border-radius: 3px;
+        border-radius: 4px;
+    }
+    .horizontal-scroll::-webkit-scrollbar-thumb:hover {
+        background: #666;
     }
     /* Make the map container take up more space */
     .stfolium-container {
         width: 100% !important;
+        margin-bottom: 24px;  /* Add space before recommendations */
     }
     /* Compact sidebar content */
     .sidebar .element-container {
@@ -198,47 +213,6 @@ filtered_landmarks = [
     and l['relevance'] >= min_rating
 ]
 
-# Recommendations section
-if st.session_state.landmarks:
-    st.markdown("### 🎯 Recommended Landmarks")
-    recommendations = st.session_state.recommender.get_recommendations(
-        st.session_state.landmarks,
-        st.session_state.map_center,
-        top_n=10  # Show more recommendations in horizontal scroll
-    )
-
-    if recommendations:
-        st.markdown('<div class="horizontal-scroll">', unsafe_allow_html=True)
-        for landmark in recommendations:
-            # Create image HTML with error handling
-            image_html = ""
-            if landmark.get('image_url'):
-                try:
-                    image_html = f'<img src="{landmark["image_url"]}" class="recommended-image" onerror="this.style.display=\'none\'; this.nextElementSibling.style.display=\'flex\';">'
-                    image_html += '<div class="placeholder-image" style="display:none;">📍 No image available</div>'
-                except Exception:
-                    image_html = '<div class="placeholder-image">📍 No image available</div>'
-            else:
-                image_html = '<div class="placeholder-image">📍 No image available</div>'
-
-            # Record interaction
-            st.session_state.recommender.record_interaction(
-                str(landmark['coordinates']),
-                landmark.get('type', 'landmark'),
-                landmark['distance']
-            )
-
-            st.markdown(f"""
-            <div class="recommendation-card">
-                {image_html}
-                <div class="recommendation-title">{landmark['title']}</div>
-                <div class="recommendation-score">Score: {landmark.get('personalized_score', 0):.2f}</div>
-                <div class="recommendation-score">Distance: {landmark['distance']:.1f}km</div>
-            </div>
-            """, unsafe_allow_html=True)
-        st.markdown('</div>', unsafe_allow_html=True)
-
-
 # Create the main map
 try:
     # Get appropriate tile URL based on mode
@@ -333,6 +307,64 @@ except Exception as e:
 
 # Display total landmarks count
 st.markdown(f"**Found {len(filtered_landmarks)} landmarks in this area**")
+
+# Add recommendations section AFTER the map
+if st.session_state.landmarks:
+    st.markdown("### 🎯 Recommended Landmarks")
+    recommendations = st.session_state.recommender.get_recommendations(
+        st.session_state.landmarks,
+        st.session_state.map_center,
+        top_n=10  # Show more recommendations in horizontal scroll
+    )
+
+    if recommendations:
+        # Start horizontal scroll container
+        st.markdown('<div class="horizontal-scroll">', unsafe_allow_html=True)
+
+        for landmark in recommendations:
+            # Create image HTML with error handling and loading state
+            image_html = ""
+            if landmark.get('image_url'):
+                try:
+                    image_html = f"""
+                        <img src="{landmark["image_url"]}" 
+                             class="recommended-image" 
+                             loading="lazy"
+                             onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"
+                        >
+                        <div class="placeholder-image" style="display:none;">
+                            📍 No image available
+                        </div>
+                    """
+                except Exception:
+                    image_html = '<div class="placeholder-image">📍 No image available</div>'
+            else:
+                image_html = '<div class="placeholder-image">📍 No image available</div>'
+
+            # Record interaction
+            st.session_state.recommender.record_interaction(
+                str(landmark['coordinates']),
+                landmark.get('type', 'landmark'),
+                landmark['distance']
+            )
+
+            # Create recommendation card
+            st.markdown(f"""
+            <div class="recommendation-card">
+                {image_html}
+                <div class="recommendation-title">{landmark['title']}</div>
+                <div class="recommendation-score">
+                    <span style="color: #1e88e5;">Score: {landmark.get('personalized_score', 0):.2f}</span>
+                </div>
+                <div class="recommendation-score">
+                    📍 {landmark['distance']:.1f}km away
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+
+        # End horizontal scroll container
+        st.markdown('</div>', unsafe_allow_html=True)
+
 
 # Move landmarks list to sidebar
 st.sidebar.markdown("---")
