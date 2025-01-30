@@ -64,41 +64,57 @@ if 'last_data_source' not in st.session_state:
     st.session_state.last_data_source = "Google Places"  # Set Google Places as default
 
 
-# CSS styling for recommendations
+# Update the CSS section at the beginning of the file
 st.markdown("""
 <style>
     .recommended-image {
         width: 100%;
-        height: 200px;
+        height: 150px;  /* Reduced height */
         object-fit: cover;
         border-radius: 10px;
-        margin-bottom: 8px;
+        margin-bottom: 4px;  /* Reduced margin */
     }
     .recommendation-card {
-        padding: 10px;
-        border-radius: 10px;
+        padding: 8px;  /* Reduced padding */
+        border-radius: 8px;
         background-color: #f0f2f6;
-        margin: 5px;
+        margin: 4px;  /* Reduced margin */
         height: 100%;
     }
     .recommendation-title {
-        font-size: 16px;
+        font-size: 14px;  /* Smaller font */
         font-weight: 500;
-        margin: 8px 0;
+        margin: 4px 0;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
     }
     .recommendation-score {
-        font-size: 14px;
+        font-size: 12px;  /* Smaller font */
         color: #555;
     }
     .placeholder-image {
         width: 100%;
-        height: 200px;
+        height: 150px;  /* Match reduced height */
         background-color: #e0e0e0;
         display: flex;
         align-items: center;
         justify-content: center;
-        border-radius: 10px;
-        margin-bottom: 8px;
+        border-radius: 8px;
+        margin-bottom: 4px;
+        font-size: 14px;  /* Smaller font */
+    }
+    /* Make the map container take up more space */
+    .stfolium-container {
+        width: 100% !important;
+    }
+    /* Reduce padding in sidebar elements */
+    .streamlit-expanderHeader {
+        padding: 0.5rem !important;
+    }
+    /* Compact sidebar content */
+    .sidebar .element-container {
+        margin-bottom: 0.5rem;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -115,7 +131,8 @@ st.markdown("### 🎯 Recommended Landmarks")
 if st.session_state.landmarks:
     recommendations = st.session_state.recommender.get_recommendations(
         st.session_state.landmarks,
-        st.session_state.map_center
+        st.session_state.map_center,
+        top_n=3  # Reduce to 3 recommendations to save space
     )
 
     if recommendations:
@@ -141,18 +158,135 @@ if st.session_state.landmarks:
                 </div>
                 """, unsafe_allow_html=True)
 
-                if st.button("👍 Favorite", key=f"fav_{i}_{landmark['title']}"):
-                    is_favorite = st.session_state.recommender.toggle_favorite(
-                        str(landmark['coordinates'])
+
+# Display total landmarks count
+filtered_landmarks = [
+    l for l in st.session_state.landmarks
+    if (search_term.lower() in l['title'].lower() or not search_term)
+    and l['relevance'] >= min_rating
+]
+st.markdown(f"**Found {len(filtered_landmarks)} landmarks in this area**")
+
+
+# Create the main map - now taking most of the width
+try:
+    # Get appropriate tile URL based on mode
+    tile_url = cache_manager.get_tile_url(os.environ['GOOGLE_MAPS_API_KEY'])
+
+    # Create base map
+    m = folium.Map(
+        location=st.session_state.map_center,
+        zoom_start=st.session_state.zoom_level,
+        tiles=tile_url,
+        attr="Map data © OpenStreetMap contributors" if st.session_state.offline_mode else "Google Maps",
+        control_scale=True,
+        prefer_canvas=True
+    )
+
+    # Add landmarks and distance circle if we have data
+    if st.session_state.landmarks:
+        add_landmarks_to_map(m, st.session_state.landmarks, show_heatmap)
+        if radius_km > 0:
+            draw_distance_circle(m, tuple(st.session_state.map_center), radius_km)
+
+    # Display map with minimal returned objects
+    map_data = st_folium(
+        m,
+        width=None,  # Let it take full width
+        height=600,
+        key="landmark_explorer",
+        returned_objects=["center", "zoom"]
+    )
+
+    # Handle map interactions with optimized updates
+    if isinstance(map_data, dict) and time.time() - st.session_state.last_update_time > 1.0:  # 1 second debounce
+        center_data = map_data.get("center")
+        new_zoom = map_data.get("zoom")
+
+        # Batch updates to reduce state changes
+        updates_needed = False
+
+        if isinstance(center_data, dict):
+            new_lat = float(center_data.get("lat", st.session_state.map_center[0]))
+            new_lng = float(center_data.get("lng", st.session_state.map_center[1]))
+
+            # Check if center changed significantly
+            if abs(new_lat - st.session_state.map_center[0]) > 0.001 or \
+               abs(new_lng - st.session_state.map_center[1]) > 0.001:
+                st.session_state.map_center = [new_lat, new_lng]
+                updates_needed = True
+
+        # Update zoom if changed
+        if new_zoom is not None and new_zoom != st.session_state.zoom_level:
+            st.session_state.zoom_level = int(new_zoom)
+            updates_needed = True
+
+        # Only fetch new landmarks if significant changes occurred
+        if updates_needed:
+            # Update URL parameters in batch
+            st.query_params.update({
+                'center': f"{st.session_state.map_center[0]},{st.session_state.map_center[1]}",
+                'zoom': str(st.session_state.zoom_level)
+            })
+
+            # Calculate bounds only when needed
+            zoom_factor = 360 / (2 ** st.session_state.zoom_level)
+            new_bounds = (
+                st.session_state.map_center[0] - zoom_factor * 0.3,  # Reduced view area
+                st.session_state.map_center[1] - zoom_factor * 0.4,
+                st.session_state.map_center[0] + zoom_factor * 0.3,
+                st.session_state.map_center[1] + zoom_factor * 0.4
+            )
+
+            # Check if bounds changed enough to warrant new data
+            if st.session_state.last_bounds is None or \
+               any(abs(a - b) > zoom_factor * 0.1 for a, b in zip(new_bounds, st.session_state.last_bounds)):
+                try:
+                    landmarks = get_cached_landmarks(
+                        new_bounds,
+                        st.session_state.zoom_level,
+                        st.session_state.offline_mode,
+                        st.session_state.wiki_language,
+                        data_source
                     )
-                    if is_favorite:
-                        st.success("Added to favorites!")
-                    else:
-                        st.info("Removed from favorites")
+                    if landmarks:
+                        st.session_state.landmarks = landmarks
+                        st.session_state.last_bounds = new_bounds
+                except Exception as e:
+                    st.error(f"Error fetching landmarks: {str(e)}")
+
+            st.session_state.last_update_time = time.time()
+
+except Exception as e:
+    st.error(f"Error rendering map: {str(e)}")
 
 
+# Move landmarks list to sidebar
+st.sidebar.markdown("---")
+st.sidebar.header("📍 Landmarks List")
+landmarks_expander = st.sidebar.expander("View All Landmarks", expanded=False)
+with landmarks_expander:
+    for landmark in filtered_landmarks:
+        with st.container():
+            process_landmark_discovery(landmark)
 
-# Sidebar controls
+            # Record interaction with landmark
+            st.session_state.recommender.record_interaction(
+                str(landmark['coordinates']),
+                landmark.get('type', 'landmark'),
+                landmark['distance']  # Add the distance parameter
+            )
+
+            st.markdown(f"""
+            <div style='background-color: #f0f2f6; padding: 0.5rem; border-radius: 0.5rem; margin-bottom: 0.5rem;'>
+                <h4 style='margin: 0;'>{landmark['title']}</h4>
+                <p style='margin: 0.2rem 0;'><strong>🎯 {landmark['relevance']:.2f}</strong> • <strong>📍 {landmark['distance']:.1f}km</strong></p>
+                <p style='margin: 0.2rem 0; font-size: 0.9em;'>{landmark['summary'][:100]}...</p>
+                <a href='{landmark['url']}' target='_blank' style='font-size: 0.9em;'>More info</a>
+            </div>
+            """, unsafe_allow_html=True)
+
+# Sidebar controls (rest of the sidebar remains the same)
 st.sidebar.header("Map Controls")
 
 # Layer toggles
@@ -353,157 +487,6 @@ if st.session_state.map_center:
         st.sidebar.warning("Unable to fetch weather data")
 
 
-# Main map container
-map_col, info_col = st.columns([2, 1])
-
-with map_col:
-    try:
-        # Get appropriate tile URL based on mode
-        tile_url = cache_manager.get_tile_url(os.environ['GOOGLE_MAPS_API_KEY'])
-
-        # Create base map
-        m = folium.Map(
-            location=st.session_state.map_center,
-            zoom_start=st.session_state.zoom_level,
-            tiles=tile_url,
-            attr="Map data © OpenStreetMap contributors" if st.session_state.offline_mode else "Google Maps",
-            control_scale=True,
-            prefer_canvas=True
-        )
-
-        # Add landmarks and distance circle if we have data
-        if st.session_state.landmarks:
-            add_landmarks_to_map(m, st.session_state.landmarks, show_heatmap)
-            if radius_km > 0:
-                draw_distance_circle(m, tuple(st.session_state.map_center), radius_km)
-
-        # Display map with minimal returned objects
-        map_data = st_folium(
-            m,
-            width=800,
-            height=600,
-            key="landmark_explorer",
-            returned_objects=["center", "zoom"]
-        )
-
-        # Handle map interactions with optimized updates
-        if isinstance(map_data, dict) and time.time() - st.session_state.last_update_time > 1.0:  # 1 second debounce
-            center_data = map_data.get("center")
-            new_zoom = map_data.get("zoom")
-
-            # Batch updates to reduce state changes
-            updates_needed = False
-
-            if isinstance(center_data, dict):
-                new_lat = float(center_data.get("lat", st.session_state.map_center[0]))
-                new_lng = float(center_data.get("lng", st.session_state.map_center[1]))
-
-                # Check if center changed significantly
-                if abs(new_lat - st.session_state.map_center[0]) > 0.001 or \
-                   abs(new_lng - st.session_state.map_center[1]) > 0.001:
-                    st.session_state.map_center = [new_lat, new_lng]
-                    updates_needed = True
-
-            # Update zoom if changed
-            if new_zoom is not None and new_zoom != st.session_state.zoom_level:
-                st.session_state.zoom_level = int(new_zoom)
-                updates_needed = True
-
-            # Only fetch new landmarks if significant changes occurred
-            if updates_needed:
-                # Update URL parameters in batch
-                st.query_params.update({
-                    'center': f"{st.session_state.map_center[0]},{st.session_state.map_center[1]}",
-                    'zoom': str(st.session_state.zoom_level)
-                })
-
-                # Calculate bounds only when needed
-                zoom_factor = 360 / (2 ** st.session_state.zoom_level)
-                new_bounds = (
-                    st.session_state.map_center[0] - zoom_factor * 0.3,  # Reduced view area
-                    st.session_state.map_center[1] - zoom_factor * 0.4,
-                    st.session_state.map_center[0] + zoom_factor * 0.3,
-                    st.session_state.map_center[1] + zoom_factor * 0.4
-                )
-
-                # Check if bounds changed enough to warrant new data
-                if st.session_state.last_bounds is None or \
-                   any(abs(a - b) > zoom_factor * 0.1 for a, b in zip(new_bounds, st.session_state.last_bounds)):
-                    try:
-                        landmarks = get_cached_landmarks(
-                            new_bounds,
-                            st.session_state.zoom_level,
-                            st.session_state.offline_mode,
-                            st.session_state.wiki_language,
-                            data_source
-                        )
-                        if landmarks:
-                            st.session_state.landmarks = landmarks
-                            st.session_state.last_bounds = new_bounds
-                    except Exception as e:
-                        st.error(f"Error fetching landmarks: {str(e)}")
-
-                st.session_state.last_update_time = time.time()
-
-    except Exception as e:
-        st.error(f"Error rendering map: {str(e)}")
-
-with info_col:
-    # Filter landmarks based on search and rating
-    filtered_landmarks = [
-        l for l in st.session_state.landmarks
-        if (search_term.lower() in l['title'].lower() or not search_term)
-        and l['relevance'] >= min_rating
-    ]
-
-    st.subheader(f"Found {len(filtered_landmarks)} Landmarks")
-
-    # Display landmarks with discovery tracking
-    def process_landmark_discovery(landmark):
-        """Process landmark discovery and handle animations"""
-        # Create unique ID for landmark
-        landmark_id = hashlib.md5(f"{landmark['title']}:{landmark['coordinates']}".encode()).hexdigest()
-
-        # Check if this is a new discovery
-        discovery_info = st.session_state.journey_tracker.add_discovery(landmark_id, landmark['title'])
-
-        if discovery_info["is_new"]:
-            # Show discovery animation
-            st.balloons()
-
-            # Show achievement notifications
-            for achievement in discovery_info.get("new_achievements", []):
-                st.success(f"🎉 Achievement Unlocked: {achievement.icon} {achievement.name}")
-                st.toast(f"New Achievement: {achievement.name}")
-
-    # Display landmarks
-    for landmark in filtered_landmarks:
-        with st.expander(landmark['title']):
-            process_landmark_discovery(landmark)
-
-            # Record interaction with landmark
-            st.session_state.recommender.record_interaction(
-                str(landmark['coordinates']),
-                landmark.get('type', 'landmark'),
-                landmark['distance']  # Add the distance parameter
-            )
-
-            # Display the landmark image if available and valid
-            if landmark.get('image_url'):
-                try:
-                    st.image(landmark['image_url'], caption=landmark['title'], use_container_width=True)
-                except Exception as e:
-                    st.warning(f"Could not load image for {landmark['title']}")
-
-            st.markdown(f"""
-            <div style='background-color: #f0f2f6; padding: 1rem; border-radius: 0.5rem;'>
-                <h3 style='margin-top: 0;'>{landmark['title']}</h3>
-                <p><strong>🎯 Relevance:</strong> {landmark['relevance']:.2f}</p>
-                <p><strong>📍 Distance:</strong> {landmark['distance']:.1f}km</p>
-                <p>{landmark['summary']}</p>
-                <a href='{landmark['url']}' target='_blank'>Read more on Google Places</a>
-            </div>
-            """, unsafe_allow_html=True)
 
 # Footer
 st.markdown("---")
@@ -519,3 +502,20 @@ def get_cached_landmarks(bounds, zoom_level, offline_mode, language, data_source
         return cache_manager.cache_landmarks(bounds, zoom_level, offline_mode, language, data_source) #pass data source to cache_manager
     except:
         return []
+
+def process_landmark_discovery(landmark):
+    """Process landmark discovery and handle animations"""
+    # Create unique ID for landmark
+    landmark_id = hashlib.md5(f"{landmark['title']}:{landmark['coordinates']}".encode()).hexdigest()
+
+    # Check if this is a new discovery
+    discovery_info = st.session_state.journey_tracker.add_discovery(landmark_id, landmark['title'])
+
+    if discovery_info["is_new"]:
+        # Show discovery animation
+        st.balloons()
+
+        # Show achievement notifications
+        for achievement in discovery_info.get("new_achievements", []):
+            st.success(f"🎉 Achievement Unlocked: {achievement.icon} {achievement.name}")
+            st.toast(f"New Achievement: {achievement.name}")
