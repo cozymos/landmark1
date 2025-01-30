@@ -100,13 +100,13 @@ class OfflineCacheManager:
 # Initialize cache manager
 cache_manager = OfflineCacheManager()
 
-@st.cache_data(ttl=3600, show_spinner=False)
+@st.cache_data(ttl=3600)
 def get_cached_landmarks(
     bounds: Tuple[float, float, float, float],
     zoom_level: int,
     offline_mode: bool = False,
     language: str = 'en',
-    data_source: str = 'Google Places'  # Change default to Google Places
+    data_source: str = 'Google Places'
 ) -> List[Dict]:
     """
     Smart wrapper for landmark caching with offline support

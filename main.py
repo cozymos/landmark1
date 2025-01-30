@@ -126,13 +126,51 @@ Explore landmarks in your area with information from Google Places.
 Pan and zoom the map to discover new locations!
 """)
 
+# Sidebar controls (moved up)
+st.sidebar.header("Map Controls")
+
+# Layer toggles
+show_heatmap = st.sidebar.checkbox("Show Heatmap", value=st.session_state.show_heatmap)
+st.session_state.show_heatmap = show_heatmap
+
+# Offline Mode Toggle
+offline_mode = st.sidebar.checkbox("📱 Offline Mode", value=st.session_state.offline_mode)
+if offline_mode != st.session_state.offline_mode:
+    st.session_state.offline_mode = offline_mode
+    if offline_mode:
+        st.sidebar.info("🔄 Offline mode enabled. Using cached map data.")
+    else:
+        st.sidebar.info("🌐 Online mode enabled. Fetching live data.")
+
+# Filters (moved up)
+st.sidebar.header("Filters")
+search_term = st.sidebar.text_input("Search landmarks", "")
+min_rating = st.sidebar.slider("Minimum relevance score", 0.0, 1.0, 0.3)
+radius_km = st.sidebar.number_input("Show distance circle (km)", min_value=0.0, max_value=50.0, value=0.0, step=0.5)
+
+# Data source selector
+st.sidebar.markdown("---")
+st.sidebar.header("🗃️ Data Source")
+data_source = st.sidebar.radio(
+    "Choose Landmarks Data Source",
+    options=["Google Places", "Wikipedia"],
+    help="Select where to fetch landmark information from"
+)
+
+# Filter landmarks based on search and rating
+filtered_landmarks = [
+    l for l in st.session_state.landmarks
+    if (search_term.lower() in l['title'].lower() or not search_term)
+    and l['relevance'] >= min_rating
+]
+
 # Recommendations section
 st.markdown("### 🎯 Recommended Landmarks")
 if st.session_state.landmarks:
     recommendations = st.session_state.recommender.get_recommendations(
         st.session_state.landmarks,
         st.session_state.map_center,
-        top_n=3  # Reduce to 3 recommendations to save space
+        top_n=3
     )
 
     if recommendations:
@@ -159,12 +197,8 @@ if st.session_state.landmarks:
                 """, unsafe_allow_html=True)
 
 
+
 # Display total landmarks count
-filtered_landmarks = [
-    l for l in st.session_state.landmarks
-    if (search_term.lower() in l['title'].lower() or not search_term)
-    and l['relevance'] >= min_rating
-]
 st.markdown(f"**Found {len(filtered_landmarks)} landmarks in this area**")
 
 
@@ -286,39 +320,6 @@ with landmarks_expander:
             </div>
             """, unsafe_allow_html=True)
 
-# Sidebar controls (rest of the sidebar remains the same)
-st.sidebar.header("Map Controls")
-
-# Layer toggles
-show_heatmap = st.sidebar.checkbox("Show Heatmap", value=st.session_state.show_heatmap)
-st.session_state.show_heatmap = show_heatmap
-
-# Offline Mode Toggle
-offline_mode = st.sidebar.checkbox("📱 Offline Mode", value=st.session_state.offline_mode)
-if offline_mode != st.session_state.offline_mode:
-    st.session_state.offline_mode = offline_mode
-    if offline_mode:
-        st.sidebar.info("🔄 Offline mode enabled. Using cached map data.")
-    else:
-        st.sidebar.info("🌐 Online mode enabled. Fetching live data.")
-
-
-# Data source selector
-st.sidebar.markdown("---")
-st.sidebar.header("🗃️ Data Source")
-data_source = st.sidebar.radio(
-    "Choose Landmarks Data Source",
-    options=["Google Places", "Wikipedia"],  # Reorder to make Google Places first
-    help="Select where to fetch landmark information from"
-)
-
-if 'last_data_source' not in st.session_state:
-    st.session_state.last_data_source = data_source
-elif st.session_state.last_data_source != data_source:
-    st.session_state.last_data_source = data_source
-    st.session_state.landmarks = []  # Clear landmarks when switching source
-    st.sidebar.success(f"Switched to {data_source} data source")
-
 # Language selector (only show for Wikipedia source)
 if data_source == "Wikipedia":
     st.sidebar.markdown("---")
@@ -341,12 +342,6 @@ if data_source == "Wikipedia":
             st.session_state.landmarks = []
         else:
             st.sidebar.error("Failed to change language")
-
-# Filters
-st.sidebar.header("Filters")
-search_term = st.sidebar.text_input("Search landmarks", "")
-min_rating = st.sidebar.slider("Minimum relevance score", 0.0, 1.0, 0.3)
-radius_km = st.sidebar.number_input("Show distance circle (km)", min_value=0.0, max_value=50.0, value=0.0, step=0.5)
 
 # Custom location
 st.sidebar.header("Custom Location")
