@@ -106,7 +106,7 @@ def get_cached_landmarks(
     zoom_level: int,
     offline_mode: bool = False,
     language: str = 'en',
-    data_source: str = 'Wikipedia'
+    data_source: str = 'Google Places'  # Change default to Google Places
 ) -> List[Dict]:
     """
     Smart wrapper for landmark caching with offline support

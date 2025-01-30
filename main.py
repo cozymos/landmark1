@@ -61,7 +61,7 @@ if 'offline_mode' not in st.session_state:
 if 'wiki_language' not in st.session_state: #added for language selection
     st.session_state.wiki_language = "en" #default language
 if 'last_data_source' not in st.session_state:
-    st.session_state.last_data_source = "Google Places" #default data source
+    st.session_state.last_data_source = "Google Places"  # Set Google Places as default
 
 
 # CSS styling for recommendations
@@ -174,7 +174,7 @@ st.sidebar.markdown("---")
 st.sidebar.header("🗃️ Data Source")
 data_source = st.sidebar.radio(
     "Choose Landmarks Data Source",
-    options=["Wikipedia", "Google Places"],
+    options=["Google Places", "Wikipedia"],  # Reorder to make Google Places first
     help="Select where to fetch landmark information from"
 )
 
