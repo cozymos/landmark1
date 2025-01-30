@@ -23,7 +23,7 @@ from coord_utils import parse_coordinates, format_dms
 from wiki_handler import WikiLandmarkFetcher
 from typing import Tuple, List, Dict
 
-# Update CSS for better horizontal scrolling and card layout
+# Update CSS for better carousel layout
 st.markdown("""
 <style>
     .recommended-image {
@@ -40,7 +40,6 @@ st.markdown("""
         background-color: #f0f2f6;
         margin: 8px;
         width: 300px;
-        flex-shrink: 0;
         transition: transform 0.2s;
         cursor: pointer;
     }
@@ -72,31 +71,6 @@ st.markdown("""
         margin-bottom: 8px;
         font-size: 14px;
     }
-    .horizontal-scroll {
-        display: flex;
-        overflow-x: auto;
-        padding: 20px 0;
-        gap: 16px;
-        scroll-behavior: smooth;
-        -webkit-overflow-scrolling: touch;
-        scrollbar-width: thin;
-        margin: 0 -16px;
-        padding: 16px;
-    }
-    .horizontal-scroll::-webkit-scrollbar {
-        height: 8px;
-    }
-    .horizontal-scroll::-webkit-scrollbar-track {
-        background: #f0f2f6;
-        border-radius: 4px;
-    }
-    .horizontal-scroll::-webkit-scrollbar-thumb {
-        background: #888;
-        border-radius: 4px;
-    }
-    .horizontal-scroll::-webkit-scrollbar-thumb:hover {
-        background: #666;
-    }
     /* Make the map container take up more space */
     .stfolium-container {
         width: 100% !important;
@@ -106,111 +80,63 @@ st.markdown("""
     .sidebar .element-container {
         margin-bottom: 0.5rem;
     }
-        /* Custom navigation buttons */
-        .swiper-button-next, .swiper-button-prev {
-            color: #1e88e5;
-            background: white;
-            padding: 20px;
-            border-radius: 50%;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-        .swiper-button-next:after, .swiper-button-prev:after {
-            font-size: 20px;
-        }
+    /* Slick carousel custom styling */
+    .slick-prev, .slick-next {
+        background: white;
+        border-radius: 50%;
+        width: 40px;
+        height: 40px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        z-index: 1;
+    }
+    .slick-prev:before, .slick-next:before {
+        color: #1e88e5;
+    }
+    .slick-track {
+        display: flex;
+        gap: 16px;
+    }
 </style>
 """, unsafe_allow_html=True)
 
-# Add Swiper.js and custom CSS
+# Add Slick Carousel CDN and initialization
 st.markdown("""
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swiper@8/swiper-bundle.min.css" />
-    <script src="https://cdn.jsdelivr.net/npm/swiper@8/swiper-bundle.min.js"></script>
-    <style>
-        .swiper {
-            width: 100%;
-            padding: 20px 0;
-        }
-        .swiper-slide {
-            width: 300px;
-            margin-right: 16px;
-        }
-        .recommended-image {
-            width: 300px;
-            height: 200px;
-            object-fit: cover;
-            border-radius: 10px;
-            margin-bottom: 8px;
-            transition: transform 0.2s;
-        }
-        .recommendation-card {
-            padding: 12px;
-            border-radius: 10px;
-            background-color: #f0f2f6;
-            width: 300px;
-            transition: transform 0.2s;
-            cursor: pointer;
-        }
-        .recommendation-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-        }
-        .recommendation-title {
-            font-size: 16px;
-            font-weight: 500;
-            margin: 8px 0;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-        .recommendation-score {
-            font-size: 14px;
-            color: #555;
-            margin-bottom: 4px;
-        }
-        .placeholder-image {
-            width: 300px;
-            height: 200px;
-            background-color: #e0e0e0;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            border-radius: 10px;
-            margin-bottom: 8px;
-            font-size: 14px;
-        }
-        /* Make the map container take up more space */
-        .stfolium-container {
-            width: 100% !important;
-            margin-bottom: 24px;
-        }
-        /* Compact sidebar content */
-        .sidebar .element-container {
-            margin-bottom: 0.5rem;
-        }
-        /* Custom navigation buttons */
-        .swiper-button-next, .swiper-button-prev {
-            color: #1e88e5;
-            background: white;
-            padding: 20px;
-            border-radius: 50%;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-        .swiper-button-next:after, .swiper-button-prev:after {
-            font-size: 20px;
-        }
-    </style>
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            new Swiper('.swiper', {
-                slidesPerView: 'auto',
-                spaceBetween: 16,
-                navigation: {
-                    nextEl: '.swiper-button-next',
-                    prevEl: '.swiper-button-prev',
-                },
-                pagination: {
-                    el: '.swiper-pagination',
-                    clickable: true,
-                },
+    <link rel="stylesheet" type="text/css" href="//cdn.jsdelivr.net/npm/slick-carousel@1.8.1/slick/slick.css"/>
+    <link rel="stylesheet" type="text/css" href="//cdn.jsdelivr.net/npm/slick-carousel@1.8.1/slick/slick-theme.css"/>
+    <script type="text/javascript" src="//code.jquery.com/jquery-1.11.0.min.js"></script>
+    <script type="text/javascript" src="//code.jquery.com/jquery-migrate-1.2.1.min.js"></script>
+    <script type="text/javascript" src="//cdn.jsdelivr.net/npm/slick-carousel@1.8.1/slick/slick.min.js"></script>
+    <script type="text/javascript">
+        $(document).ready(function(){
+            $('.recommendations-carousel').slick({
+                dots: true,
+                infinite: false,
+                speed: 300,
+                slidesToShow: 4,
+                slidesToScroll: 1,
+                responsive: [
+                    {
+                        breakpoint: 1024,
+                        settings: {
+                            slidesToShow: 3,
+                            slidesToScroll: 1
+                        }
+                    },
+                    {
+                        breakpoint: 768,
+                        settings: {
+                            slidesToShow: 2,
+                            slidesToScroll: 1
+                        }
+                    },
+                    {
+                        breakpoint: 480,
+                        settings: {
+                            slidesToShow: 1,
+                            slidesToScroll: 1
+                        }
+                    }
+                ]
             });
         });
     </script>
@@ -425,11 +351,8 @@ if st.session_state.landmarks:
     )
 
     if recommendations:
-        # Create Swiper container
-        st.markdown("""
-        <div class="swiper">
-            <div class="swiper-wrapper">
-        """, unsafe_allow_html=True)
+        # Create Slick carousel container
+        st.markdown('<div class="recommendations-carousel">', unsafe_allow_html=True)
 
         for landmark in recommendations:
             # Create image HTML with error handling
@@ -458,9 +381,9 @@ if st.session_state.landmarks:
                 landmark['distance']
             )
 
-            # Create Swiper slide
+            # Create carousel slide
             st.markdown(f"""
-            <div class="swiper-slide">
+            <div>
                 <div class="recommendation-card">
                     {image_html}
                     <div class="recommendation-title">{landmark['title']}</div>
@@ -474,14 +397,8 @@ if st.session_state.landmarks:
             </div>
             """, unsafe_allow_html=True)
 
-        # Add navigation and pagination
-        st.markdown("""
-            </div>
-            <div class="swiper-pagination"></div>
-            <div class="swiper-button-prev"></div>
-            <div class="swiper-button-next"></div>
-        </div>
-        """, unsafe_allow_html=True)
+        # Close carousel container
+        st.markdown('</div>', unsafe_allow_html=True)
 
 
 # Move landmarks list to sidebar
