@@ -1,22 +1,24 @@
 # Page config must come first
 import streamlit as st
-from ai_handler import LandmarkAIHandler
-
-ai_handler = LandmarkAIHandler()
-
 st.set_page_config(page_title="Landmarks Locator",
                    page_icon="🗺️",
                    layout="wide")
 
 import folium
 from streamlit_folium import st_folium
-from map_utils import draw_distance_circle, add_landmarks_to_map
-from cache_manager import OfflineCacheManager
 import time
 import math
 from urllib.parse import quote, unquote
-from coord_utils import parse_coordinates, format_dms
 from typing import Tuple, List, Dict
+from map_utils import draw_distance_circle, add_landmarks_to_map
+from coord_utils import parse_coordinates, format_dms
+
+# Initialize cache manager
+from cache_manager import OfflineCacheManager
+cache_manager = OfflineCacheManager()
+
+from ai_handler import LandmarkAIHandler
+ai_handler = LandmarkAIHandler()
 
 # Update CSS for basic styling only
 st.markdown("""
@@ -33,10 +35,6 @@ st.markdown("""
 </style>
 """,
             unsafe_allow_html=True)
-
-# Add debounce time to session state
-if 'last_update_time' not in st.session_state:
-    st.session_state.last_update_time = 0
 
 # Initialize session state with URL parameters if available
 if 'map_center' not in st.session_state:
@@ -60,20 +58,18 @@ if 'landmarks' not in st.session_state:
     st.session_state.landmarks = []
 if 'show_circle' not in st.session_state:
     st.session_state.show_circle = False
+if 'ai_landmarks' not in st.session_state:
+    st.session_state.ai_landmarks = False
 if 'offline_mode' not in st.session_state:
     st.session_state.offline_mode = False
 if 'last_data_source' not in st.session_state:
-    st.session_state.last_data_source = "Wikipedia"  # Changed default to Wikipedia
-
-# Initialize cache manager
-cache_manager = OfflineCacheManager()
-
-# Initialize velocity tracking in session state if not present
+    st.session_state.last_data_source = "Wikipedia"  # Default to Wikipedia
 if 'last_position' not in st.session_state:
     st.session_state.last_position = st.session_state.map_center
 if 'last_velocity' not in st.session_state:
     st.session_state.last_velocity = 0
-
+if 'last_update_time' not in st.session_state:
+    st.session_state.last_update_time = 0
 
 def get_landmarks(bounds: Tuple[float, float, float, float],
                   zoom_level: int,
@@ -100,7 +96,7 @@ def get_landmarks(bounds: Tuple[float, float, float, float],
                 landmarks = places_handler.get_landmarks(bounds)
 
             # Enhance landmarks with AI if not in offline mode
-            if landmarks and not st.session_state.offline_mode:
+            if landmarks and st.session_state.ai_landmarks and not st.session_state.offline_mode:
                 landmarks = [ai_handler.enhance_landmark_description(landmark) for landmark in landmarks]
 
             # Cache the landmarks for offline use
@@ -122,6 +118,8 @@ st.sidebar.header("🗺️ Landmarks Locator")
 st.session_state.show_circle = st.sidebar.checkbox(
     "Show Location", value=st.session_state.show_circle)
 radius_km = 1 if st.session_state.show_circle else 0
+st.session_state.ai_landmarks = st.sidebar.checkbox(
+    "AI landmarks", value=st.session_state.ai_landmarks)
 
 try:
     # Create base map
@@ -242,24 +240,25 @@ landmarks_expander = st.sidebar.expander(
 with landmarks_expander:
     for landmark in st.session_state.landmarks:
         with st.container():
-            st.subheader(landmark['title'])
-            if 'enhanced_description' in landmark:
-                st.write(landmark['enhanced_description'])
-            if 'historical_significance' in landmark:
-                st.write("**Historical Significance:**")
-                st.write(landmark['historical_significance'])
-            if 'best_times' in landmark:
-                st.write("**Best Times to Visit:**")
-                st.write(landmark['best_times'])
-            if 'interesting_facts' in landmark:
-                st.write("**Interesting Facts:**")
-                for fact in landmark['interesting_facts']:
-                    st.markdown(f"• {fact}")
+            if st.session_state.ai_landmarks:
+                st.subheader(landmark['title'])
+                if 'enhanced_description' in landmark:
+                    st.write(landmark['enhanced_description'])
+                if 'historical_significance' in landmark:
+                    st.write("**Historical Significance:**")
+                    st.write(landmark['historical_significance'])
+                if 'best_times' in landmark:
+                    st.write("**Best Times to Visit:**")
+                    st.write(landmark['best_times'])
+                if 'interesting_facts' in landmark:
+                    st.write("**Interesting Facts:**")
+                    for fact in landmark['interesting_facts']:
+                        st.markdown(f"• {fact}")
+                st.divider()
             if 'image_url' in landmark:
                 st.image(landmark['image_url'],
-                        caption=f"[Learn more]({landmark['url']})",
+                        caption=f"[{landmark['title']}]({landmark['url']})",
                         use_container_width=True)
-            st.divider()
 
 # Custom location
 st.sidebar.markdown("---")
