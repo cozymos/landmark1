@@ -1,27 +1,7 @@
 import folium
 from folium import plugins
 from typing import Tuple, List, Dict
-import branca.colormap as cm
-import streamlit as st
 
-def create_base_map() -> folium.Map:
-    """Create the base Folium map with plugins"""
-    # Create map with current session state
-    m = folium.Map(
-        location=st.session_state.map_center,
-        zoom_start=st.session_state.zoom_level,
-        tiles='OpenStreetMap',
-        control_scale=True,
-        prefer_canvas=True  # Use canvas renderer for better performance
-    )
-
-    # Add fullscreen button
-    plugins.Fullscreen().add_to(m)
-
-    # Add locate control
-    plugins.LocateControl().add_to(m)
-
-    return m
 
 def get_relevance_color(relevance: float) -> str:
     """Get marker color based on relevance score"""
@@ -32,20 +12,22 @@ def get_relevance_color(relevance: float) -> str:
     else:
         return 'blue'
 
+
 def create_marker_cluster() -> plugins.MarkerCluster:
     """Create a marker cluster group"""
-    return plugins.MarkerCluster(
-        name='Landmarks',
-        overlay=True,
-        control=True,
-        icon_create_function=None,
-        options={
-            'maxClusterRadius': 50,
-            'disableClusteringAtZoom': 16
-        }
-    )
+    return plugins.MarkerCluster(name='Landmarks',
+                                 overlay=True,
+                                 control=True,
+                                 icon_create_function=None,
+                                 options={
+                                     'maxClusterRadius': 50,
+                                     'disableClusteringAtZoom': 16
+                                 })
 
-def add_landmarks_to_map(m: folium.Map, landmarks: List[Dict], show_heatmap: bool = False) -> None:
+
+def add_landmarks_to_map(m: folium.Map,
+                         landmarks: List[Dict],
+                         show_heatmap: bool = False) -> None:
     """Add landmark markers to the map with clustering and optional heatmap"""
     # Create marker cluster and add to map
     marker_cluster = create_marker_cluster()
@@ -86,27 +68,26 @@ def add_landmarks_to_map(m: folium.Map, landmarks: List[Dict], show_heatmap: boo
 
     # Add heatmap if there's data and it's enabled
     if heat_data and show_heatmap:
-        plugins.HeatMap(
-            data=heat_data,
-            name='Heatmap',
-            min_opacity=0.3,
-            max_zoom=18,
-            radius=25,
-            blur=15,
-            overlay=True,
-            control=True,
-            show=show_heatmap
-        ).add_to(m)
+        plugins.HeatMap(data=heat_data,
+                        name='Heatmap',
+                        min_opacity=0.3,
+                        max_zoom=18,
+                        radius=25,
+                        blur=15,
+                        overlay=True,
+                        control=True,
+                        show=show_heatmap).add_to(m)
 
     # Add layer control
     folium.LayerControl().add_to(m)
 
-def draw_distance_circle(m: folium.Map, center: Tuple[float, float], radius_km: float):
+
+def draw_distance_circle(m: folium.Map, center: Tuple[float, float],
+                         radius_km: float):
     """Draw a circle with given radius around a point"""
     folium.Circle(
         location=center,
         radius=radius_km * 1000,  # Convert km to meters
         color='green',
         fill=True,
-        popup=f'{radius_km}km radius'
-    ).add_to(m)
+        popup=f'{radius_km}km radius').add_to(m)

@@ -11,4 +11,5 @@ dependencies = [
     "geopy>=2.4.1",
     "googlemaps>=4.10.0",
     "branca>=0.8.1",
+    "requests>=2.32.3",
 ]
