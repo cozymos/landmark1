@@ -1,7 +1,7 @@
 import json
 import os
 from openai import OpenAI
-from typing import List, Dict, Optional
+from typing import Dict
 
 # the newest OpenAI model is "gpt-4o" which was released May 13, 2024.
 # do not change this unless explicitly requested by the user
@@ -12,7 +12,7 @@ class LandmarkAIHandler:
     def __init__(self):
         if not OPENAI_API_KEY:
             raise ValueError("OpenAI API key not found in environment variables")
-        
+
     def enhance_landmark_description(self, landmark: Dict) -> Dict:
         """Enhance a landmark's description using AI."""
         try:
@@ -20,13 +20,13 @@ class LandmarkAIHandler:
             Name: {landmark.get('title')}
             Description: {landmark.get('description', '')}
             Location: {landmark.get('lat')}, {landmark.get('lon')}
-            
+
             Please provide:
             1. A more engaging description
             2. Historical significance
             3. Best times to visit
             4. Three interesting facts
-            
+
             Respond with JSON in this format:
             {{
                 "enhanced_description": "string",
@@ -35,79 +35,17 @@ class LandmarkAIHandler:
                 "interesting_facts": ["fact1", "fact2", "fact3"]
             }}
             """
-            
+
             response = client.chat.completions.create(
                 model="gpt-4o",
                 messages=[{"role": "user", "content": prompt}],
                 response_format={"type": "json_object"}
             )
-            
+
             enhanced_data = json.loads(response.choices[0].message.content)
             landmark.update(enhanced_data)
             return landmark
-            
+
         except Exception as e:
             print(f"Error enhancing landmark description: {e}")
             return landmark
-    
-    def get_personalized_recommendations(
-        self, 
-        landmarks: List[Dict], 
-        preferences: Optional[Dict] = None
-    ) -> List[Dict]:
-        """Get personalized landmark recommendations based on user preferences."""
-        try:
-            landmarks_info = "\n".join(
-                [f"- {l['title']}: {l.get('description', 'No description')}" 
-                 for l in landmarks[:5]]  # Limit to 5 landmarks for context
-            )
-            
-            preferences_str = ""
-            if preferences:
-                preferences_str = "\nUser preferences:\n" + "\n".join(
-                    [f"- {k}: {v}" for k, v in preferences.items()]
-                )
-            
-            prompt = f"""Based on these landmarks and preferences, rank and explain why
-            someone should visit them. Respond in JSON format.
-            
-            Landmarks:
-            {landmarks_info}
-            {preferences_str}
-            
-            Provide output in this format:
-            {{
-                "recommendations": [
-                    {{
-                        "title": "landmark_name",
-                        "rank": number,
-                        "reasoning": "string",
-                        "ideal_for": ["type1", "type2"]
-                    }}
-                ]
-            }}
-            """
-            
-            response = client.chat.completions.create(
-                model="gpt-4o",
-                messages=[{"role": "user", "content": prompt}],
-                response_format={"type": "json_object"}
-            )
-            
-            recommendations = json.loads(response.choices[0].message.content)
-            
-            # Update landmarks with recommendation data
-            recommendations_dict = {
-                rec['title']: rec 
-                for rec in recommendations['recommendations']
-            }
-            
-            for landmark in landmarks:
-                if landmark['title'] in recommendations_dict:
-                    landmark.update(recommendations_dict[landmark['title']])
-            
-            return sorted(landmarks, key=lambda x: x.get('rank', float('inf')))
-            
-        except Exception as e:
-            print(f"Error getting recommendations: {e}")
-            return landmarks
