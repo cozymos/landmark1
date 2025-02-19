@@ -3,27 +3,14 @@ import geopy.distance
 from typing import Dict, List, Tuple
 import time
 import math
-import streamlit as st
 
 class WikiLandmarkFetcher:
     def __init__(self):
-        # Initialize language in session state if not present
-        if 'wiki_language' not in st.session_state:
-            st.session_state.wiki_language = 'en'
-
-        self.supported_languages = {
-            'en': 'English',
-            'es': 'Español',
-            'fr': 'Français',
-            'de': 'Deutsch',
-            'it': 'Italiano',
-            'ja': '日本語',
-            'zh': '中文'
-        }
-
-        # Create Wikipedia API instance with current language
-        self._init_wiki_instance()
-
+        self.wiki = wikipediaapi.Wikipedia(
+            'LandmarkExplorer/1.0',
+            'en',
+            extract_format=wikipediaapi.ExtractFormat.WIKI
+        )
         self.last_request = 0
         self.min_delay = 1  # Minimum delay between requests in seconds
 
@@ -55,26 +42,6 @@ class WikiLandmarkFetcher:
             }
         }
 
-    def _init_wiki_instance(self):
-        """Initialize or reinitialize Wikipedia API instance with current language"""
-        self.wiki = wikipediaapi.Wikipedia(
-            'LandmarkExplorer/1.0',
-            st.session_state.wiki_language,
-            extract_format=wikipediaapi.ExtractFormat.WIKI
-        )
-
-    def set_language(self, language_code: str) -> bool:
-        """Set the Wikipedia language and reinitialize the API instance"""
-        if language_code in self.supported_languages:
-            st.session_state.wiki_language = language_code
-            self._init_wiki_instance()
-            return True
-        return False
-
-    def get_supported_languages(self) -> Dict[str, str]:
-        """Return dictionary of supported languages"""
-        return self.supported_languages
-
     def _rate_limit(self):
         """Implement rate limiting"""
         current_time = time.time()
@@ -85,7 +52,7 @@ class WikiLandmarkFetcher:
 
     def get_landmarks(self, bounds: Tuple[float, float, float, float]) -> List[Dict]:
         """
-        Fetch landmarks within the given bounds with content in current language
+        Fetch landmarks within the given bounds
         bounds: (south, west, north, east)
         """
         self._rate_limit()
@@ -123,19 +90,17 @@ class WikiLandmarkFetcher:
                     relevance = 1.0 - (distance / max_distance if max_distance > 0 else 0)
                     relevance = max(0.1, min(1.0, relevance))
 
-                    # Get language-specific title based on test data
-                    # In a real implementation, this would use the Wikipedia API's language links
+                    # Fetch Wikipedia page
                     page = self.wiki.page(landmark['title'])
                     if page.exists():
                         landmarks.append({
                             'title': page.title,
                             'summary': page.summary[:200] + "..." if len(page.summary) > 200 else page.summary,
                             'url': page.fullurl,
-                            'image_url': landmark['image_url'],
+                            'image_url': landmark['image_url'],  # Add the image URL
                             'distance': round(distance, 2),
                             'relevance': round(relevance, 2),
-                            'coordinates': (landmark['lat'], landmark['lon']),
-                            'language': st.session_state.wiki_language
+                            'coordinates': (landmark['lat'], landmark['lon'])
                         })
 
             return landmarks
