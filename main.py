@@ -1,5 +1,8 @@
 # Page config must come first
 import streamlit as st
+from ai_handler import LandmarkAIHandler
+
+ai_handler = LandmarkAIHandler()
 
 st.set_page_config(page_title="Landmarks Locator",
                    page_icon="🗺️",
@@ -96,6 +99,15 @@ def get_landmarks(bounds: Tuple[float, float, float, float],
                 places_handler = GooglePlacesHandler()
                 landmarks = places_handler.get_landmarks(bounds)
 
+            # Enhance landmarks with AI if not in offline mode
+            if landmarks and not st.session_state.offline_mode:
+                # Get user preferences if available
+                preferences = st.session_state.get('user_preferences', None)
+
+                # Enhance descriptions and get recommendations
+                landmarks = [ai_handler.enhance_landmark_description(landmark) for landmark in landmarks]
+                landmarks = ai_handler.get_personalized_recommendations(landmarks, preferences)
+
             # Cache the landmarks for offline use
             if landmarks:
                 cache_manager.cache_landmarks(landmarks, bounds)
@@ -115,6 +127,26 @@ st.sidebar.header("🗺️ Landmarks Locator")
 st.session_state.show_circle = st.sidebar.checkbox(
     "Show Location", value=st.session_state.show_circle)
 radius_km = 1 if st.session_state.show_circle else 0
+st.sidebar.header("🎯 Personalization")
+with st.sidebar.expander("Set Your Preferences", expanded=False):
+    preferences = {
+        'interests': st.multiselect(
+            "Your Interests",
+            ["History", "Architecture", "Nature", "Art", "Culture", "Food"],
+            default=st.session_state.get('interests', ["History", "Architecture"])
+        ),
+        'visit_duration': st.select_slider(
+            "Typical Visit Duration",
+            options=["30 mins", "1 hour", "2 hours", "Half day", "Full day"],
+            value=st.session_state.get('visit_duration', "2 hours")
+        ),
+        'accessibility': st.checkbox(
+            "Prioritize Accessible Locations",
+            value=st.session_state.get('accessibility', False)
+        )
+    }
+    st.session_state.user_preferences = preferences
+
 try:
     # Create base map
     m = folium.Map(location=st.session_state.map_center,
@@ -234,11 +266,27 @@ landmarks_expander = st.sidebar.expander(
 with landmarks_expander:
     for landmark in st.session_state.landmarks:
         with st.container():
-            # Display the landmark image if available
+            st.subheader(landmark['title'])
+            if 'rank' in landmark:
+                st.caption(f"Recommendation Rank: {landmark['rank']}")
+            if 'reasoning' in landmark:
+                st.info(landmark['reasoning'])
+            if 'ideal_for' in landmark:
+                st.caption(f"Ideal for: {', '.join(landmark['ideal_for'])}")
+            if 'enhanced_description' in landmark:
+                st.write(landmark['enhanced_description'])
+            if 'historical_significance' in landmark:
+                st.write("**Historical Significance:**")
+                st.write(landmark['historical_significance'])
+            if 'interesting_facts' in landmark:
+                st.write("**Interesting Facts:**")
+                for fact in landmark['interesting_facts']:
+                    st.markdown(f"• {fact}")
             if 'image_url' in landmark:
                 st.image(landmark['image_url'],
-                         caption=f"[{landmark['title']}]({landmark['url']})",
-                         use_container_width=True)
+                        caption=f"[Learn more]({landmark['url']})",
+                        use_container_width=True)
+            st.divider()
 
 # Custom location
 st.sidebar.markdown("---")
