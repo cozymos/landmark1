@@ -5,41 +5,19 @@ st.set_page_config(page_title="Landmarks Locator",
                    layout="wide",
                    initial_sidebar_state="expanded")
 
-# Update CSS for full height and proper map display
+# Update CSS for width and margins only
 st.markdown("""
 <style>
-    /* Full width container */
     .block-container {
         padding-top: 1rem;
         padding-bottom: 0;
         max-width: 100%;
     }
 
-    /* Main content area */
-    .main {
-        flex: 1;
-        min-height: 100vh;
-    }
-
-    /* Map container styling */
-    .stfolium-container {
-        width: 100% !important;
-        height: 800px !important;  /* Fixed height */
-        margin: 0;
-    }
-
-    /* Ensure the folium map fills its container */
-    .folium-map {
-        width: 100% !important;
-        height: 100% !important;
-    }
-
-    /* Compact sidebar */
     .sidebar .element-container {
         margin-bottom: 0.5rem;
     }
 
-    /* Hide footer */
     footer {
         display: none;
     }
@@ -183,11 +161,11 @@ try:
                      float(st.session_state.map_center[1]))
             draw_distance_circle(m, center, radius_km)
 
-    # Display map with full height
+    # Display map with explicit height
     map_data = st_folium(
         m,
-        width=None,  # Let it take full width
-        height=None,  # Let CSS control the height
+        width="100%",
+        height=800,  # Explicit height in pixels
         key="landmark_locator",
         returned_objects=["center", "zoom", "bounds"])
 
