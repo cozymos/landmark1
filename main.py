@@ -2,7 +2,8 @@
 import streamlit as st
 st.set_page_config(page_title="Landmarks Locator",
                    page_icon="🗺️",
-                   layout="wide")
+                   layout="wide",
+                   initial_sidebar_state="expanded")
 
 import folium
 from streamlit_folium import st_folium
@@ -20,21 +21,39 @@ cache_manager = OfflineCacheManager()
 from ai_handler import LandmarkAIHandler
 ai_handler = LandmarkAIHandler()
 
-# Update CSS for basic styling only
+# Update CSS for full height
 st.markdown("""
 <style>
-    /* Make the map container take up more space */
+    /* Make the map container take full viewport height */
     .stfolium-container {
         width: 100% !important;
-        margin-bottom: 24px;
+        height: calc(100vh - 80px) !important;  /* Account for header space */
+        margin-bottom: 0;
     }
+
+    /* Ensure the folium map itself fills the container */
+    .folium-map {
+        height: 100% !important;
+    }
+
     /* Compact sidebar content */
     .sidebar .element-container {
         margin-bottom: 0.5rem;
     }
+
+    /* Hide unnecessary padding */
+    .main .block-container {
+        padding-top: 1rem;
+        padding-bottom: 0;
+        max-width: 100%;
+    }
+
+    /* Hide footer */
+    footer {
+        display: none;
+    }
 </style>
-""",
-            unsafe_allow_html=True)
+""", unsafe_allow_html=True)
 
 # Initialize session state with URL parameters if available
 if 'map_center' not in st.session_state:
@@ -156,11 +175,11 @@ try:
                      float(st.session_state.map_center[1]))
             draw_distance_circle(m, center, radius_km)
 
-    # Display map with minimal returned objects
+    # Display map with full height
     map_data = st_folium(
         m,
         width=None,  # Let it take full width
-        height=600,
+        height=None,  # Let CSS control the height
         key="landmark_locator",
         returned_objects=["center", "zoom", "bounds"])
 
@@ -193,11 +212,10 @@ try:
                 bounds_data['_northEast']['lng']
             )
 
-    # Add search button after the map
-    col1, col2 = st.columns([4, 1])
-    with col2:
-        if st.button("🔍 Search This Area"):
-            update_landmarks()
+    # Move search button to sidebar to maximize map space
+    st.sidebar.markdown("---")
+    if st.sidebar.button("🔍 Search This Area", type="primary"):
+        update_landmarks()
 
 except Exception as e:
     st.error(f"Error rendering map: {str(e)}")
@@ -366,5 +384,4 @@ if data_source != st.session_state.last_data_source:
             st.error(f"Error fetching landmarks: {str(e)}")
     st.rerun()
 
-# Footer
-st.markdown("---")
+# Footer (removed due to CSS)
