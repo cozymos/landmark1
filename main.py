@@ -177,14 +177,12 @@ try:
             st.session_state.map_center = [new_lat, new_lng]
             st.query_params['center'] = f"{new_lat},{new_lng}"
 
-        # Ensure zoom level is properly handled as integer
+        # Handle zoom changes without forcing refresh
         if new_zoom is not None:
             new_zoom = int(float(new_zoom))  # Convert to float first to handle any decimal values
             if new_zoom != st.session_state.zoom_level:
                 st.session_state.zoom_level = new_zoom
                 st.query_params['zoom'] = str(new_zoom)
-                # Rerun to ensure map updates with new zoom level
-                st.rerun()
 
         # Update current bounds from map
         if bounds_data:
