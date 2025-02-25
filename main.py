@@ -43,8 +43,7 @@ if 'map_center' not in st.session_state:
         lat, lon = map(float, center_str.split(','))
         st.session_state.map_center = [lat, lon]
     except:
-        st.session_state.map_center = [37.7749,
-                                       -122.4194]  # Default to San Francisco
+        st.session_state.map_center = [37.7749, -122.4194]  # Default to San Francisco
 
 if 'zoom_level' not in st.session_state:
     try:
@@ -52,6 +51,8 @@ if 'zoom_level' not in st.session_state:
     except:
         st.session_state.zoom_level = 12
 
+if 'current_bounds' not in st.session_state:
+    st.session_state.current_bounds = None
 if 'last_bounds' not in st.session_state:
     st.session_state.last_bounds = None
 if 'landmarks' not in st.session_state:
@@ -64,12 +65,6 @@ if 'offline_mode' not in st.session_state:
     st.session_state.offline_mode = False
 if 'last_data_source' not in st.session_state:
     st.session_state.last_data_source = "Wikipedia"  # Default to Wikipedia
-if 'last_position' not in st.session_state:
-    st.session_state.last_position = st.session_state.map_center
-if 'last_velocity' not in st.session_state:
-    st.session_state.last_velocity = 0
-if 'last_update_time' not in st.session_state:
-    st.session_state.last_update_time = 0
 
 def get_landmarks(bounds: Tuple[float, float, float, float],
                   zoom_level: int,
@@ -114,10 +109,33 @@ def get_landmarks(bounds: Tuple[float, float, float, float],
         return []
 
 
+def update_landmarks():
+    """Update landmarks for the current map view."""
+    if not st.session_state.current_bounds:
+        return
+
+    bounds = st.session_state.current_bounds
+    try:
+        with st.spinner('Fetching landmarks...'):
+            landmarks = get_landmarks(
+                bounds,
+                st.session_state.zoom_level,
+                data_source=st.session_state.last_data_source)
+            if landmarks:
+                st.session_state.landmarks = landmarks
+                st.session_state.last_bounds = bounds
+    except Exception as e:
+        st.error(f"Error fetching landmarks: {str(e)}")
+
+# Sidebar controls
 st.sidebar.header("🗺️ Landmarks Locator")
+
+# Show circle control
 st.session_state.show_circle = st.sidebar.checkbox(
     "Show Location", value=st.session_state.show_circle)
 radius_km = 1 if st.session_state.show_circle else 0
+
+# AI landmarks toggle
 st.session_state.ai_landmarks = st.sidebar.checkbox(
     "AI landmarks", value=st.session_state.ai_landmarks)
 
@@ -126,8 +144,7 @@ try:
     m = folium.Map(location=st.session_state.map_center,
                    zoom_start=st.session_state.zoom_level,
                    tiles=cache_manager.get_tile_url(),
-                   attr="OpenStreetMap"
-                   if st.session_state.offline_mode else "Google Maps",
+                   attr="OpenStreetMap" if st.session_state.offline_mode else "Google Maps",
                    control_scale=True,
                    prefer_canvas=True)
 
@@ -135,9 +152,8 @@ try:
     if st.session_state.landmarks:
         add_landmarks_to_map(m, st.session_state.landmarks, False)
         if radius_km > 0:
-            # Ensure center is passed as a proper tuple of two floats
             center = (float(st.session_state.map_center[0]),
-                      float(st.session_state.map_center[1]))
+                     float(st.session_state.map_center[1]))
             draw_distance_circle(m, center, radius_km)
 
     # Display map with minimal returned objects
@@ -146,101 +162,38 @@ try:
         width=None,  # Let it take full width
         height=600,
         key="landmark_locator",
-        returned_objects=["center", "zoom"])
+        returned_objects=["center", "zoom", "bounds"])
 
-    # Handle map interactions with optimized updates
+    # Handle map interactions
     if isinstance(map_data, dict):
+        # Update center and zoom
         center_data = map_data.get("center")
         new_zoom = map_data.get("zoom")
-        current_time = time.time()
-        time_delta = current_time - st.session_state.last_update_time
-
-        # Batch updates to reduce state changes
-        updates_needed = False
+        bounds_data = map_data.get("bounds")
 
         if isinstance(center_data, dict):
-            new_lat = float(
-                center_data.get("lat", st.session_state.map_center[0]))
-            new_lng = float(
-                center_data.get("lng", st.session_state.map_center[1]))
+            new_lat = float(center_data.get("lat", st.session_state.map_center[0]))
+            new_lng = float(center_data.get("lng", st.session_state.map_center[1]))
+            
 
-            # Calculate movement velocity
-            if time_delta > 0:
-                distance = math.sqrt(
-                    (new_lat - st.session_state.last_position[0])**2 +
-                    (new_lng - st.session_state.last_position[1])**2)
-                current_velocity = distance / time_delta
-                # Smooth velocity using exponential moving average
-                st.session_state.last_velocity = (
-                    0.7 * st.session_state.last_velocity +
-                    0.3 * current_velocity)
-
-            # Adjust debounce time based on velocity
-            min_debounce = 0.2  # Minimum debounce time in seconds
-            max_debounce = 2.0  # Maximum debounce time in seconds
-            velocity_factor = 1.0 / (1 + st.session_state.last_velocity * 10
-                                     )  # Adjust multiplier as needed
-            debounce_time = min_debounce + (max_debounce -
-                                           min_debounce) * velocity_factor
-
-            # Check if enough time has passed since last update
-            if time_delta >= debounce_time:
-                # Check if center changed significantly
-                if abs(new_lat - st.session_state.map_center[0]) > 0.001 or \
-                   abs(new_lng - st.session_state.map_center[1]) > 0.001:
-                    st.session_state.map_center = [new_lat, new_lng]
-                    st.session_state.last_position = [new_lat, new_lng]
-                    updates_needed = True
-
-        # Update zoom if changed
         if new_zoom is not None and new_zoom != st.session_state.zoom_level:
             st.session_state.zoom_level = int(new_zoom)
-            updates_needed = True
+            st.query_params['zoom'] = str(new_zoom)
 
-        # Only fetch new landmarks if significant changes occurred
-        if updates_needed:
-            # Update URL parameters in batch
-            st.query_params.update({
-                'center':
-                f"{st.session_state.map_center[0]},{st.session_state.map_center[1]}",
-                'zoom': str(st.session_state.zoom_level)
-            })
+        # Update current bounds from map
+        if bounds_data:
+            st.session_state.current_bounds = (
+                bounds_data['_southWest']['lat'],
+                bounds_data['_southWest']['lng'],
+                bounds_data['_northEast']['lat'],
+                bounds_data['_northEast']['lng']
+            )
 
-            # Calculate bounds only when needed
-            zoom_factor = 360 / (2**st.session_state.zoom_level)
-            # Adjust bounds threshold based on zoom level
-            threshold_factor = max(0.05, min(0.3, 1 / (2**(st.session_state.zoom_level - 8))))
-
-            new_bounds = (
-                st.session_state.map_center[0] - zoom_factor * 0.3,
-                st.session_state.map_center[1] - zoom_factor * 0.4,
-                st.session_state.map_center[0] + zoom_factor * 0.3,
-                st.session_state.map_center[1] + zoom_factor * 0.4)
-
-            # More precise bounds change detection
-            bounds_changed = False
-            if st.session_state.last_bounds:
-                bounds_diff = [abs(a - b) for a, b in zip(new_bounds, st.session_state.last_bounds)]
-                max_diff = max(bounds_diff)
-                bounds_changed = max_diff > (zoom_factor * threshold_factor)
-            else:
-                bounds_changed = True
-
-            # Only fetch new data if bounds changed significantly
-            if bounds_changed:
-                with st.spinner('Fetching landmarks...'):
-                    try:
-                        landmarks = get_landmarks(
-                            new_bounds,
-                            st.session_state.zoom_level,
-                            data_source=st.session_state.last_data_source)
-                        if landmarks:
-                            st.session_state.landmarks = landmarks
-                            st.session_state.last_bounds = new_bounds
-                    except Exception as e:
-                        st.error(f"Error fetching landmarks: {str(e)}")
-
-            st.session_state.last_update_time = current_time
+    # Add search button after the map
+    col1, col2 = st.columns([4, 1])
+    with col2:
+        if st.button("🔍 Search This Area"):
+            update_landmarks()
 
 except Exception as e:
     st.error(f"Error rendering map: {str(e)}")
