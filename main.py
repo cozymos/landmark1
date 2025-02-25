@@ -181,7 +181,7 @@ try:
             velocity_factor = 1.0 / (1 + st.session_state.last_velocity * 10
                                      )  # Adjust multiplier as needed
             debounce_time = min_debounce + (max_debounce -
-                                            min_debounce) * velocity_factor
+                                           min_debounce) * velocity_factor
 
             # Check if enough time has passed since last update
             if time_delta >= debounce_time:
@@ -208,26 +208,37 @@ try:
 
             # Calculate bounds only when needed
             zoom_factor = 360 / (2**st.session_state.zoom_level)
+            # Adjust bounds threshold based on zoom level
+            threshold_factor = max(0.05, min(0.3, 1 / (2**(st.session_state.zoom_level - 8))))
+
             new_bounds = (
-                st.session_state.map_center[0] -
-                zoom_factor * 0.3,  # Reduced view area
+                st.session_state.map_center[0] - zoom_factor * 0.3,
                 st.session_state.map_center[1] - zoom_factor * 0.4,
                 st.session_state.map_center[0] + zoom_factor * 0.3,
                 st.session_state.map_center[1] + zoom_factor * 0.4)
 
-            # Check if bounds changed enough to warrant new data
-            if st.session_state.last_bounds is None or \
-               any(abs(a - b) > zoom_factor * 0.1 for a, b in zip(new_bounds, st.session_state.last_bounds)):
-                try:
-                    landmarks = get_landmarks(
-                        new_bounds,
-                        st.session_state.zoom_level,
-                        data_source=st.session_state.last_data_source)
-                    if landmarks:
-                        st.session_state.landmarks = landmarks
-                        st.session_state.last_bounds = new_bounds
-                except Exception as e:
-                    st.error(f"Error fetching landmarks: {str(e)}")
+            # More precise bounds change detection
+            bounds_changed = False
+            if st.session_state.last_bounds:
+                bounds_diff = [abs(a - b) for a, b in zip(new_bounds, st.session_state.last_bounds)]
+                max_diff = max(bounds_diff)
+                bounds_changed = max_diff > (zoom_factor * threshold_factor)
+            else:
+                bounds_changed = True
+
+            # Only fetch new data if bounds changed significantly
+            if bounds_changed:
+                with st.spinner('Fetching landmarks...'):
+                    try:
+                        landmarks = get_landmarks(
+                            new_bounds,
+                            st.session_state.zoom_level,
+                            data_source=st.session_state.last_data_source)
+                        if landmarks:
+                            st.session_state.landmarks = landmarks
+                            st.session_state.last_bounds = new_bounds
+                    except Exception as e:
+                        st.error(f"Error fetching landmarks: {str(e)}")
 
             st.session_state.last_update_time = current_time
 
