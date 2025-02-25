@@ -174,11 +174,17 @@ try:
         if isinstance(center_data, dict):
             new_lat = float(center_data.get("lat", st.session_state.map_center[0]))
             new_lng = float(center_data.get("lng", st.session_state.map_center[1]))
-            
+            st.session_state.map_center = [new_lat, new_lng]
+            st.query_params['center'] = f"{new_lat},{new_lng}"
 
-        if new_zoom is not None and new_zoom != st.session_state.zoom_level:
-            st.session_state.zoom_level = int(new_zoom)
-            st.query_params['zoom'] = str(new_zoom)
+        # Ensure zoom level is properly handled as integer
+        if new_zoom is not None:
+            new_zoom = int(float(new_zoom))  # Convert to float first to handle any decimal values
+            if new_zoom != st.session_state.zoom_level:
+                st.session_state.zoom_level = new_zoom
+                st.query_params['zoom'] = str(new_zoom)
+                # Rerun to ensure map updates with new zoom level
+                st.rerun()
 
         # Update current bounds from map
         if bounds_data:
