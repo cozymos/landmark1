@@ -24,6 +24,27 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
+# Add JavaScript for dynamic height calculation
+st.markdown("""
+<script>
+    // Function to update map height
+    function updateMapHeight() {
+        const headerHeight = 60;  // Streamlit header
+        const topPadding = 16;    // Container padding
+        const bottomBuffer = 10;   // Bottom buffer
+        const availableHeight = window.innerHeight - headerHeight - topPadding - bottomBuffer;
+        const mapContainer = document.querySelector('.stfolium-container');
+        if (mapContainer) {
+            mapContainer.style.height = availableHeight + 'px';
+        }
+    }
+
+    // Update height on load and resize
+    window.addEventListener('load', updateMapHeight);
+    window.addEventListener('resize', updateMapHeight);
+</script>
+""", unsafe_allow_html=True)
+
 # Rest of your imports
 import folium
 from streamlit_folium import st_folium
@@ -161,11 +182,11 @@ try:
                      float(st.session_state.map_center[1]))
             draw_distance_circle(m, center, radius_km)
 
-    # Display map with explicit height
+    # Display map with dynamic height
     map_data = st_folium(
         m,
         width="100%",
-        height=800,  # Explicit height in pixels
+        height=700,  # Initial height, will be adjusted by JavaScript
         key="landmark_locator",
         returned_objects=["center", "zoom", "bounds"])
 
