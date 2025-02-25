@@ -5,6 +5,48 @@ st.set_page_config(page_title="Landmarks Locator",
                    layout="wide",
                    initial_sidebar_state="expanded")
 
+# Update CSS for full height and proper map display
+st.markdown("""
+<style>
+    /* Full width container */
+    .block-container {
+        padding-top: 1rem;
+        padding-bottom: 0;
+        max-width: 100%;
+    }
+
+    /* Main content area */
+    .main {
+        flex: 1;
+        min-height: 100vh;
+    }
+
+    /* Map container styling */
+    .stfolium-container {
+        width: 100% !important;
+        height: 800px !important;  /* Fixed height */
+        margin: 0;
+    }
+
+    /* Ensure the folium map fills its container */
+    .folium-map {
+        width: 100% !important;
+        height: 100% !important;
+    }
+
+    /* Compact sidebar */
+    .sidebar .element-container {
+        margin-bottom: 0.5rem;
+    }
+
+    /* Hide footer */
+    footer {
+        display: none;
+    }
+</style>
+""", unsafe_allow_html=True)
+
+# Rest of your imports
 import folium
 from streamlit_folium import st_folium
 import time
@@ -20,40 +62,6 @@ cache_manager = OfflineCacheManager()
 
 from ai_handler import LandmarkAIHandler
 ai_handler = LandmarkAIHandler()
-
-# Update CSS for full height
-st.markdown("""
-<style>
-    /* Make the map container take full viewport height */
-    .stfolium-container {
-        width: 100% !important;
-        height: calc(100vh - 80px) !important;  /* Account for header space */
-        margin-bottom: 0;
-    }
-
-    /* Ensure the folium map itself fills the container */
-    .folium-map {
-        height: 100% !important;
-    }
-
-    /* Compact sidebar content */
-    .sidebar .element-container {
-        margin-bottom: 0.5rem;
-    }
-
-    /* Hide unnecessary padding */
-    .main .block-container {
-        padding-top: 1rem;
-        padding-bottom: 0;
-        max-width: 100%;
-    }
-
-    /* Hide footer */
-    footer {
-        display: none;
-    }
-</style>
-""", unsafe_allow_html=True)
 
 # Initialize session state with URL parameters if available
 if 'map_center' not in st.session_state:
