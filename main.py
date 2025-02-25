@@ -91,6 +91,9 @@ if 'offline_mode' not in st.session_state:
     st.session_state.offline_mode = False
 if 'last_data_source' not in st.session_state:
     st.session_state.last_data_source = "Wikipedia"  # Default to Wikipedia
+if 'show_markers' not in st.session_state:
+    st.session_state.show_markers = True
+
 
 def get_landmarks(bounds: Tuple[float, float, float, float],
                   zoom_level: int,
@@ -156,6 +159,10 @@ def update_landmarks():
 # Sidebar controls
 st.sidebar.header("🗺️ Landmarks Locator")
 
+# Show markers control
+st.session_state.show_markers = st.sidebar.checkbox(
+    "Show Markers", value=st.session_state.show_markers)
+
 # Show circle control
 st.session_state.show_circle = st.sidebar.checkbox(
     "Show Location", value=st.session_state.show_circle)
@@ -175,12 +182,12 @@ try:
                    prefer_canvas=True)
 
     # Add landmarks and distance circle if we have data
-    if st.session_state.landmarks:
+    if st.session_state.landmarks and st.session_state.show_markers:
         add_landmarks_to_map(m, st.session_state.landmarks, False)
-        if radius_km > 0:
-            center = (float(st.session_state.map_center[0]),
-                     float(st.session_state.map_center[1]))
-            draw_distance_circle(m, center, radius_km)
+    if radius_km > 0:
+        center = (float(st.session_state.map_center[0]),
+                 float(st.session_state.map_center[1]))
+        draw_distance_circle(m, center, radius_km)
 
     # Display map with dynamic height
     map_data = st_folium(
@@ -219,8 +226,6 @@ try:
                 bounds_data['_northEast']['lng']
             )
 
-    # Move search button to sidebar to maximize map space
-    st.sidebar.markdown("---")
     if st.sidebar.button("🔍 Search This Area", type="primary"):
         update_landmarks()
 
@@ -390,5 +395,3 @@ if data_source != st.session_state.last_data_source:
         except Exception as e:
             st.error(f"Error fetching landmarks: {str(e)}")
     st.rerun()
-
-# Footer (removed due to CSS)
