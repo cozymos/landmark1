@@ -1,12 +1,16 @@
 # Page config must come first
 import streamlit as st
-st.set_page_config(page_title="Landmarks Locator",
-                   page_icon="🗺️",
-                   layout="wide",
-                   initial_sidebar_state="expanded")
+
+st.set_page_config(
+    page_title="Landmarks Locator",
+    page_icon="🗺️",
+    layout="wide",
+    initial_sidebar_state="expanded",
+)
 
 # Update CSS for width and margins only
-st.markdown("""
+st.markdown(
+    """
 <style>
     .block-container {
         padding-top: 1rem;
@@ -22,10 +26,13 @@ st.markdown("""
         display: none;
     }
 </style>
-""", unsafe_allow_html=True)
+""",
+    unsafe_allow_html=True,
+)
 
 # Add JavaScript for dynamic height calculation
-st.markdown("""
+st.markdown(
+    """
 <script>
     // Function to update map height
     function updateMapHeight() {
@@ -43,7 +50,9 @@ st.markdown("""
     window.addEventListener('load', updateMapHeight);
     window.addEventListener('resize', updateMapHeight);
 </script>
-""", unsafe_allow_html=True)
+""",
+    unsafe_allow_html=True,
+)
 
 # Rest of your imports
 import folium
@@ -57,47 +66,48 @@ from coord_utils import parse_coordinates, format_dms
 
 # Initialize cache manager
 from cache_manager import OfflineCacheManager
+
 cache_manager = OfflineCacheManager()
 
-from ai_handler import LandmarkAIHandler
-ai_handler = LandmarkAIHandler()
-
 # Initialize session state with URL parameters if available
-if 'map_center' not in st.session_state:
+if "map_center" not in st.session_state:
     try:
-        center_str = st.query_params.get('center', '37.7749,-122.4194')
-        lat, lon = map(float, center_str.split(','))
+        center_str = st.query_params.get("center", "37.7749,-122.4194")
+        lat, lon = map(float, center_str.split(","))
         st.session_state.map_center = [lat, lon]
     except:
-        st.session_state.map_center = [37.7749, -122.4194]  # Default to San Francisco
+        st.session_state.map_center = [
+            37.7749,
+            -122.4194,
+        ]  # Default to San Francisco
 
-if 'zoom_level' not in st.session_state:
+if "zoom_level" not in st.session_state:
     try:
-        st.session_state.zoom_level = int(st.query_params.get('zoom', '12'))
+        st.session_state.zoom_level = int(st.query_params.get("zoom", "12"))
     except:
         st.session_state.zoom_level = 12
 
-if 'current_bounds' not in st.session_state:
+if "current_bounds" not in st.session_state:
     st.session_state.current_bounds = None
-if 'last_bounds' not in st.session_state:
+if "last_bounds" not in st.session_state:
     st.session_state.last_bounds = None
-if 'landmarks' not in st.session_state:
+if "landmarks" not in st.session_state:
     st.session_state.landmarks = []
-if 'show_circle' not in st.session_state:
+if "show_circle" not in st.session_state:
     st.session_state.show_circle = False
-if 'ai_landmarks' not in st.session_state:
-    st.session_state.ai_landmarks = False
-if 'offline_mode' not in st.session_state:
+if "offline_mode" not in st.session_state:
     st.session_state.offline_mode = False
-if 'last_data_source' not in st.session_state:
+if "last_data_source" not in st.session_state:
     st.session_state.last_data_source = "Wikipedia"  # Default to Wikipedia
-if 'show_markers' not in st.session_state:
+if "show_markers" not in st.session_state:
     st.session_state.show_markers = True
 
 
-def get_landmarks(bounds: Tuple[float, float, float, float],
-                  zoom_level: int,
-                  data_source: str = 'Wikipedia') -> List[Dict]:
+def get_landmarks(
+    bounds: Tuple[float, float, float, float],
+    zoom_level: int,
+    data_source: str = "Wikipedia",
+) -> List[Dict]:
     """
     Fetch and cache landmarks for the given area
     """
@@ -112,16 +122,14 @@ def get_landmarks(bounds: Tuple[float, float, float, float],
 
             if data_source == "Wikipedia":
                 from wiki_handler import WikiLandmarkFetcher
+
                 wiki_fetcher = WikiLandmarkFetcher()
                 landmarks = wiki_fetcher.get_landmarks(bounds)
             else:  # Google Places
                 from google_places import GooglePlacesHandler
+
                 places_handler = GooglePlacesHandler()
                 landmarks = places_handler.get_landmarks(bounds)
-
-            # Enhance landmarks with AI if not in offline mode
-            if landmarks and st.session_state.ai_landmarks and not st.session_state.offline_mode:
-                landmarks = [ai_handler.enhance_landmark_description(landmark) for landmark in landmarks]
 
             # Cache the landmarks for offline use
             if landmarks:
@@ -145,48 +153,53 @@ def update_landmarks():
 
     bounds = st.session_state.current_bounds
     try:
-        with st.spinner('Fetching landmarks...'):
+        with st.spinner("Fetching landmarks..."):
             landmarks = get_landmarks(
                 bounds,
                 st.session_state.zoom_level,
-                data_source=st.session_state.last_data_source)
+                data_source=st.session_state.last_data_source,
+            )
             if landmarks:
                 st.session_state.landmarks = landmarks
                 st.session_state.last_bounds = bounds
     except Exception as e:
         st.error(f"Error fetching landmarks: {str(e)}")
 
+
 # Sidebar controls
 st.sidebar.header("🗺️ Landmarks Locator")
 
 # Show markers control
 st.session_state.show_markers = st.sidebar.checkbox(
-    "Show Markers", value=st.session_state.show_markers)
+    "Show Markers", value=st.session_state.show_markers
+)
 
 # Show circle control
 st.session_state.show_circle = st.sidebar.checkbox(
-    "Show Location", value=st.session_state.show_circle)
+    "Show Location", value=st.session_state.show_circle
+)
 radius_km = 1 if st.session_state.show_circle else 0
-
-# AI landmarks toggle
-st.session_state.ai_landmarks = st.sidebar.checkbox(
-    "AI landmarks", value=st.session_state.ai_landmarks)
-
 try:
     # Create base map
-    m = folium.Map(location=st.session_state.map_center,
-                   zoom_start=st.session_state.zoom_level,
-                   tiles=cache_manager.get_tile_url(),
-                   attr="OpenStreetMap" if st.session_state.offline_mode else "Google Maps",
-                   control_scale=True,
-                   prefer_canvas=True)
+    m = folium.Map(
+        location=st.session_state.map_center,
+        zoom_start=st.session_state.zoom_level,
+        tiles=cache_manager.get_tile_url(),
+        attr=(
+            "OpenStreetMap" if st.session_state.offline_mode else "Google Maps"
+        ),
+        control_scale=True,
+        prefer_canvas=True,
+    )
 
     # Add landmarks and distance circle if we have data
     if st.session_state.landmarks and st.session_state.show_markers:
         add_landmarks_to_map(m, st.session_state.landmarks, False)
     if radius_km > 0:
-        center = (float(st.session_state.map_center[0]),
-                 float(st.session_state.map_center[1]))
+        center = (
+            float(st.session_state.map_center[0]),
+            float(st.session_state.map_center[1]),
+        )
         draw_distance_circle(m, center, radius_km)
 
     # Display map with dynamic height
@@ -195,7 +208,8 @@ try:
         width="100%",
         height=700,  # Initial height, will be adjusted by JavaScript
         key="landmark_locator",
-        returned_objects=["center", "zoom", "bounds"])
+        returned_objects=["center", "zoom", "bounds"],
+    )
 
     # Handle map interactions
     if isinstance(map_data, dict):
@@ -205,25 +219,31 @@ try:
         bounds_data = map_data.get("bounds")
 
         if isinstance(center_data, dict):
-            new_lat = float(center_data.get("lat", st.session_state.map_center[0]))
-            new_lng = float(center_data.get("lng", st.session_state.map_center[1]))
+            new_lat = float(
+                center_data.get("lat", st.session_state.map_center[0])
+            )
+            new_lng = float(
+                center_data.get("lng", st.session_state.map_center[1])
+            )
             st.session_state.map_center = [new_lat, new_lng]
-            st.query_params['center'] = f"{new_lat},{new_lng}"
+            st.query_params["center"] = f"{new_lat},{new_lng}"
 
         # Handle zoom changes without forcing refresh
         if new_zoom is not None:
-            new_zoom = int(float(new_zoom))  # Convert to float first to handle any decimal values
+            new_zoom = int(
+                float(new_zoom)
+            )  # Convert to float first to handle any decimal values
             if new_zoom != st.session_state.zoom_level:
                 st.session_state.zoom_level = new_zoom
-                st.query_params['zoom'] = str(new_zoom)
+                st.query_params["zoom"] = str(new_zoom)
 
         # Update current bounds from map
         if bounds_data:
             st.session_state.current_bounds = (
-                bounds_data['_southWest']['lat'],
-                bounds_data['_southWest']['lng'],
-                bounds_data['_northEast']['lat'],
-                bounds_data['_northEast']['lng']
+                bounds_data["_southWest"]["lat"],
+                bounds_data["_southWest"]["lng"],
+                bounds_data["_northEast"]["lat"],
+                bounds_data["_northEast"]["lng"],
             )
 
     if st.sidebar.button("🔍 Search This Area", type="primary"):
@@ -234,29 +254,18 @@ except Exception as e:
 
 # Display landmarks
 landmarks_expander = st.sidebar.expander(
-    f"View {len(st.session_state.landmarks)} Landmarks", expanded=False)
+    f"View {len(st.session_state.landmarks)} Landmarks", expanded=False
+)
 with landmarks_expander:
     for landmark in st.session_state.landmarks:
         with st.container():
-            if st.session_state.ai_landmarks:
-                st.subheader(landmark['title'])
-                if 'enhanced_description' in landmark:
-                    st.write(landmark['enhanced_description'])
-                if 'historical_significance' in landmark:
-                    st.write("**Historical Significance:**")
-                    st.write(landmark['historical_significance'])
-                if 'best_times' in landmark:
-                    st.write("**Best Times to Visit:**")
-                    st.write(landmark['best_times'])
-                if 'interesting_facts' in landmark:
-                    st.write("**Interesting Facts:**")
-                    for fact in landmark['interesting_facts']:
-                        st.markdown(f"• {fact}")
-                st.divider()
-            if 'image_url' in landmark:
-                st.image(landmark['image_url'],
-                        caption=f"[{landmark['title']}]({landmark['url']})",
-                        use_container_width=True)
+            # Display the landmark image if available
+            if "image_url" in landmark:
+                st.image(
+                    landmark["image_url"],
+                    caption=f"[{landmark['title']}]({landmark['url']})",
+                    use_container_width=True,
+                )
 
 # Custom location
 st.sidebar.markdown("---")
@@ -264,11 +273,12 @@ st.sidebar.markdown("---")
 # Add combined coordinates input
 combined_coords = st.sidebar.text_input(
     "Custom Location",
-    help="Enter coordinates in either format:\n" +
-    "• Decimal Degrees (DD): 37.3349, -122.0090\n" +
-    "• DMS: 37°20'5.64\"N, 122°0'32.40\"W",
+    help="Enter coordinates in either format:\n"
+    + "• Decimal Degrees (DD): 37.3349, -122.0090\n"
+    + "• DMS: 37°20'5.64\"N, 122°0'32.40\"W",
     placeholder="Enter coordinates (DD or DMS)",
-    key="combined_coords")
+    key="combined_coords",
+)
 
 # Initialize coordinate values
 custom_lat = None
@@ -281,31 +291,38 @@ if combined_coords:
         custom_lat = coords.lat
         custom_lon = coords.lon
         coords_valid = True
-        st.sidebar.success(f"""
+        st.sidebar.success(
+            f"""
         ✅ Valid coordinates:
         • DD: {custom_lat:.4f}, {custom_lon:.4f}
         • DMS: {format_dms(custom_lat, True)}, {format_dms(custom_lon, False)}
-        """)
+        """
+        )
     else:
         st.sidebar.error(
-            "Invalid coordinate format. Please use DD or DMS format.")
+            "Invalid coordinate format. Please use DD or DMS format."
+        )
 
 # Separate lat/lon inputs with synced values
 lat_input = st.sidebar.number_input(
     "Latitude",
-    value=float(custom_lat if custom_lat is not None else st.session_state.
-                map_center[0]),
+    value=float(
+        custom_lat if custom_lat is not None else st.session_state.map_center[0]
+    ),
     format="%.4f",
     help="Decimal degrees (e.g., 37.3349)",
-    key="lat_input")
+    key="lat_input",
+)
 
 lon_input = st.sidebar.number_input(
     "Longitude",
-    value=float(custom_lon if custom_lon is not None else st.session_state.
-                map_center[1]),
+    value=float(
+        custom_lon if custom_lon is not None else st.session_state.map_center[1]
+    ),
     format="%.4f",
     help="Decimal degrees (e.g., -122.0090)",
-    key="lon_input")
+    key="lon_input",
+)
 
 # Update values from separate inputs if combined input is empty
 if not combined_coords:
@@ -313,19 +330,26 @@ if not combined_coords:
     custom_lon = lon_input
     # Show both formats for separate input values
     if -90 <= lat_input <= 90 and -180 <= lon_input <= 180:
-        st.sidebar.success(f"""
+        st.sidebar.success(
+            f"""
         ✅ Current coordinates:
         • DD: {custom_lat:.4f}, {custom_lon:.4f}
         • DMS: {format_dms(custom_lat, True)}, {format_dms(custom_lon, False)}
-        """)
+        """
+        )
 
 if st.sidebar.button("Go to Location"):
-    if custom_lat is not None and custom_lon is not None and -90 <= custom_lat <= 90 and -180 <= custom_lon <= 180:
+    if (
+        custom_lat is not None
+        and custom_lon is not None
+        and -90 <= custom_lat <= 90
+        and -180 <= custom_lon <= 180
+    ):
         st.session_state.map_center = [custom_lat, custom_lon]
         st.session_state.zoom_level = 12
         # Update URL parameters
-        st.query_params['center'] = f"{custom_lat},{custom_lon}"
-        st.query_params['zoom'] = str(st.session_state.zoom_level)
+        st.query_params["center"] = f"{custom_lat},{custom_lon}"
+        st.query_params["zoom"] = str(st.session_state.zoom_level)
     else:
         st.sidebar.error(
             "Invalid coordinates. Latitude must be between -90 and 90, longitude between -180 and 180."
@@ -334,8 +358,9 @@ if st.sidebar.button("Go to Location"):
 st.sidebar.header("Map Controls")
 
 # Offline Mode Toggle
-offline_mode = st.sidebar.checkbox("📱 Offline Mode",
-                                   value=st.session_state.offline_mode)
+offline_mode = st.sidebar.checkbox(
+    "📱 Offline Mode", value=st.session_state.offline_mode
+)
 if offline_mode != st.session_state.offline_mode:
     st.session_state.offline_mode = offline_mode
     if offline_mode:
@@ -349,12 +374,14 @@ if st.session_state.offline_mode:
 
     # Display cache statistics
     cache_stats = cache_manager.get_cache_stats()
-    st.sidebar.markdown(f"""
+    st.sidebar.markdown(
+        f"""
     **Cache Statistics:**
     - 📍 Landmarks: {cache_stats['landmarks_cached']}
     - 🖼️ Images: {cache_stats['images_cached']}
     - 🕒 Last Update: {cache_stats['last_update'] or 'Never'}
-    """)
+    """
+    )
 
     # Cache management buttons
     col1, col2 = st.sidebar.columns(2)
@@ -365,7 +392,8 @@ if st.session_state.offline_mode:
                 landmarks = get_landmarks(
                     st.session_state.last_bounds,
                     st.session_state.zoom_level,
-                    data_source=st.session_state.last_data_source)
+                    data_source=st.session_state.last_data_source,
+                )
                 if landmarks:
                     st.session_state.landmarks = landmarks
                     st.success("Cache updated successfully!")
@@ -378,16 +406,19 @@ data_source = st.sidebar.radio(
     "Choose Landmarks Data Source",
     options=["Wikipedia", "Google Places"],
     help="Select where to fetch landmark information from",
-    key="data_source")
+    key="data_source",
+)
 
 if data_source != st.session_state.last_data_source:
     st.session_state.last_data_source = data_source
     # Force refresh of landmarks with new data source
     if st.session_state.last_bounds:
         try:
-            landmarks = get_landmarks(st.session_state.last_bounds,
-                                      st.session_state.zoom_level,
-                                      data_source=data_source)
+            landmarks = get_landmarks(
+                st.session_state.last_bounds,
+                st.session_state.zoom_level,
+                data_source=data_source,
+            )
             if landmarks:
                 st.session_state.landmarks = landmarks
             else:
