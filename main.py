@@ -80,12 +80,16 @@ if "map_center" not in st.session_state:
             37.7749,
             -122.4194,
         ]  # Default to San Francisco
+if "new_center" not in st.session_state:
+    st.session_state.new_center = st.session_state.map_center
 
 if "zoom_level" not in st.session_state:
     try:
         st.session_state.zoom_level = int(st.query_params.get("zoom", "12"))
     except:
         st.session_state.zoom_level = 12
+if "new_zoom" not in st.session_state:
+    st.session_state.new_zoom = st.session_state.zoom_level
 
 if "current_bounds" not in st.session_state:
     st.session_state.current_bounds = None
@@ -151,6 +155,8 @@ def update_landmarks():
     if not st.session_state.current_bounds:
         return
 
+    st.session_state.map_center = st.session_state.new_center
+    st.session_state.zoom_level = st.session_state.new_zoom
     bounds = st.session_state.current_bounds
     try:
         with st.spinner("Fetching landmarks..."):
@@ -162,6 +168,11 @@ def update_landmarks():
             if landmarks:
                 st.session_state.landmarks = landmarks
                 st.session_state.last_bounds = bounds
+
+        new_lat = st.session_state.new_center[0]
+        new_lng = st.session_state.new_center[1]
+        st.query_params["center"] = f"{new_lat},{new_lng}"
+        st.query_params["zoom"] = str(st.session_state.new_zoom)
     except Exception as e:
         st.error(f"Error fetching landmarks: {str(e)}")
 
@@ -225,8 +236,7 @@ try:
             new_lng = float(
                 center_data.get("lng", st.session_state.map_center[1])
             )
-            st.session_state.map_center = [new_lat, new_lng]
-            st.query_params["center"] = f"{new_lat},{new_lng}"
+            st.session_state.new_center = [new_lat, new_lng]
 
         # Handle zoom changes without forcing refresh
         if new_zoom is not None:
@@ -234,8 +244,7 @@ try:
                 float(new_zoom)
             )  # Convert to float first to handle any decimal values
             if new_zoom != st.session_state.zoom_level:
-                st.session_state.zoom_level = new_zoom
-                st.query_params["zoom"] = str(new_zoom)
+                st.session_state.new_zoom = new_zoom
 
         # Update current bounds from map
         if bounds_data:
