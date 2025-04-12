@@ -12,8 +12,6 @@ import logging
 class OfflineCacheManager:
 
     def __init__(self):
-        # Set up logging
-        logging.basicConfig(level=logging.INFO)
         self.logger = logging.getLogger(__name__)
 
         # Initialize cache directories with absolute paths

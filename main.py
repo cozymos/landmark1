@@ -8,51 +8,46 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
+import logging
+
+# Set up logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("main")
+
 # Update CSS for width and margins only
 st.markdown(
     """
 <style>
     .block-container {
-        padding-top: 1rem;
+        padding-top: 0;
         padding-bottom: 0;
         max-width: 100%;
-    }
-
-    .sidebar .element-container {
-        margin-bottom: 0.5rem;
-    }
-
-    footer {
-        display: none;
     }
 </style>
 """,
     unsafe_allow_html=True,
 )
 
-# Add JavaScript for dynamic height calculation
-st.markdown(
-    """
-<script>
-    // Function to update map height
-    function updateMapHeight() {
-        const headerHeight = 60;  // Streamlit header
-        const topPadding = 16;    // Container padding
-        const bottomBuffer = 10;   // Bottom buffer
-        const availableHeight = window.innerHeight - headerHeight - topPadding - bottomBuffer;
-        const mapContainer = document.querySelector('.stfolium-container');
-        if (mapContainer) {
-            mapContainer.style.height = availableHeight + 'px';
-        }
-    }
 
-    // Update height on load and resize
-    window.addEventListener('load', updateMapHeight);
-    window.addEventListener('resize', updateMapHeight);
-</script>
-""",
-    unsafe_allow_html=True,
-)
+# Add map height control in sidebar
+optimal_height = st.sidebar.number_input("Map Height (pixels)", 
+    min_value=300,
+    max_value=1200,
+    value=st.session_state.get('map_height', 600),
+    step=50)
+
+# Store height in session state
+st.session_state.map_height = optimal_height
+
+# Calculate and set page height for map sizing
+st.session_state.current_page_height = 600  # Default viewport height
+
+# Update session state with viewport height if available
+if 'vh' in st.query_params:
+    st.session_state.current_page_height = int(st.query_params['vh'])
+    logger.info(
+        f"Viewport height set to {st.session_state.current_page_height} pixels."
+    )
 
 # Rest of your imports
 import folium
@@ -217,7 +212,7 @@ try:
     map_data = st_folium(
         m,
         width="100%",
-        height=700,  # Initial height, will be adjusted by JavaScript
+        height=st.session_state.current_page_height,
         key="landmark_locator",
         returned_objects=["center", "zoom", "bounds"],
     )
