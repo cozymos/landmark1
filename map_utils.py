@@ -92,14 +92,42 @@ from urllib.parse import quote
 
 # Function to convert local file path to a URL
 def local_file_to_url(file_path):
-    # Convert to absolute path and normalize
+    # Check if it's already a file:// URL
+    if file_path.startswith('file://'):
+        return file_path
+    
+    # Check if it's already a web URL
+    if file_path.startswith('http://') or file_path.startswith('https://'):
+        return file_path
+        
+    # For local files, we need to serve them through Streamlit's static file serving
+    # Strip any existing file:// prefix if present
+    if file_path.startswith('file:/'):
+        file_path = file_path.replace('file:/', '')
+        # Remove any extra slashes
+        while file_path.startswith('/'):
+            file_path = file_path[1:]
+    
+    # Normalize the path
     abs_path = os.path.abspath(file_path)
-    # Convert backslashes to forward slashes
-    path_with_forward_slashes = abs_path.replace('\\', '/')
-    # URL encode the path
-    encoded_path = quote(path_with_forward_slashes)
-    # Create proper file URI
-    return f"file:/{encoded_path}"
+    
+    # Create a relative path that Streamlit can serve
+    # Assuming .cache folder is at the root of the Streamlit application
+    if '.cache/images/' in abs_path:
+        # Extract just the filename from the path
+        filename = os.path.basename(abs_path)
+        # For Streamlit to properly serve static files, we need to use a web URL
+        # This uses a base64 data URL approach
+        try:
+            with open(abs_path, 'rb') as img_file:
+                import base64
+                img_data = base64.b64encode(img_file.read()).decode('utf-8')
+                return f"data:image/jpeg;base64,{img_data}"
+        except Exception as e:
+            logger.error(f"Error reading image file {abs_path}: {str(e)}")
+            return ""
+    
+    return file_path
 
 
 def add_landmarks_to_map(m: folium.Map,
