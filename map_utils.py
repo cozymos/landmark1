@@ -90,34 +90,51 @@ def get_relevance_color(relevance: float) -> str:
 from urllib.parse import quote
 
 
-# Function to convert local file path to a URL
+# Function to convert local file path to a URL - cross-platform compatible
 def local_file_to_url(file_path):
-    # Check if it's already a file:// URL
-    if file_path.startswith('file://'):
-        return file_path
-    
+    """
+    Convert a file path to a data URL with base64 encoding to ensure cross-platform compatibility
+    Works on Windows, Mac, and Linux
+    """
     # Check if it's already a web URL
     if file_path.startswith('http://') or file_path.startswith('https://'):
         return file_path
         
-    # For local files, we need to serve them through Streamlit's static file serving
     # Strip any existing file:// prefix if present
-    if file_path.startswith('file:/'):
-        file_path = file_path.replace('file:/', '')
+    if file_path.startswith('file:'):
+        # Handle different variations of file URLs
+        if file_path.startswith('file:///'):
+            file_path = file_path[8:]  # Remove 'file:///'
+        elif file_path.startswith('file://'):
+            file_path = file_path[7:]  # Remove 'file://'
+        elif file_path.startswith('file:/'):
+            file_path = file_path[6:]  # Remove 'file:/'
+        
         # Remove any extra slashes
         while file_path.startswith('/'):
             file_path = file_path[1:]
     
-    # Normalize the path
-    abs_path = os.path.abspath(file_path)
-    
-    # Create a relative path that Streamlit can serve
-    # Assuming .cache folder is at the root of the Streamlit application
-    if '.cache/images/' in abs_path:
-        # Extract just the filename from the path
-        filename = os.path.basename(abs_path)
-        # For Streamlit to properly serve static files, we need to use a web URL
-        # This uses a base64 data URL approach
+    # Normalize the path for the current operating system
+    try:
+        # Try to use the path as is
+        abs_path = os.path.abspath(file_path)
+        
+        # If the file doesn't exist, try to search for it in the common cache directory
+        if not os.path.exists(abs_path):
+            filename = os.path.basename(file_path)
+            possible_paths = [
+                os.path.join(os.getcwd(), '.cache', 'images', filename),
+                os.path.join(os.path.expanduser('~'), '.cache', 'images', filename),
+                os.path.join('/home/runner/workspace', '.cache', 'images', filename)
+            ]
+            
+            for path in possible_paths:
+                if os.path.exists(path):
+                    abs_path = path
+                    break
+        
+        # Convert the file to a data URL using base64 encoding
+        # This works across all platforms and browsers
         try:
             with open(abs_path, 'rb') as img_file:
                 import base64
@@ -125,7 +142,12 @@ def local_file_to_url(file_path):
                 return f"data:image/jpeg;base64,{img_data}"
         except Exception as e:
             logger.error(f"Error reading image file {abs_path}: {str(e)}")
+            # If we fail to read the file, log the error and return an empty string
+            # This will show a broken image in the UI
             return ""
+    except Exception as e:
+        logger.error(f"Error processing file path {file_path}: {str(e)}")
+        return ""
     
     return file_path
 
