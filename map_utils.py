@@ -87,66 +87,30 @@ def get_relevance_color(relevance: float) -> str:
         return 'blue'
 
 
-from urllib.parse import quote
-
-
-# Function to convert local file path to a URL - cross-platform compatible
 def local_file_to_url(file_path):
     """
-    Convert a file path to a data URL with base64 encoding to ensure cross-platform compatibility
-    Works on Windows, Mac, and Linux
+    Convert a file path to a data URL with base64 encoding to work cross-platform
     """
     # Check if it's already a web URL
     if file_path.startswith('http://') or file_path.startswith('https://'):
         return file_path
         
     # Strip any existing file:// prefix if present
-    if file_path.startswith('file:'):
-        # Handle different variations of file URLs
-        if file_path.startswith('file:///'):
-            file_path = file_path[8:]  # Remove 'file:///'
-        elif file_path.startswith('file://'):
-            file_path = file_path[7:]  # Remove 'file://'
-        elif file_path.startswith('file:/'):
-            file_path = file_path[6:]  # Remove 'file:/'
-        
-        # Remove any extra slashes
-        while file_path.startswith('/'):
-            file_path = file_path[1:]
+    if file_path.startswith('file://'):
+        file_path = file_path[7:]  # Remove 'file://'
     
-    # Normalize the path for the current operating system
     try:
-        # Try to use the path as is
         abs_path = os.path.abspath(file_path)
-        
-        # If the file doesn't exist, try to search for it in the common cache directory
-        if not os.path.exists(abs_path):
-            filename = os.path.basename(file_path)
-            possible_paths = [
-                os.path.join(os.getcwd(), '.cache', 'images', filename),
-                os.path.join(os.path.expanduser('~'), '.cache', 'images', filename),
-                os.path.join('/home/runner/workspace', '.cache', 'images', filename)
-            ]
-            
-            for path in possible_paths:
-                if os.path.exists(path):
-                    abs_path = path
-                    break
-        
         # Convert the file to a data URL using base64 encoding
         # This works across all platforms and browsers
-        try:
-            with open(abs_path, 'rb') as img_file:
-                import base64
-                img_data = base64.b64encode(img_file.read()).decode('utf-8')
-                return f"data:image/jpeg;base64,{img_data}"
-        except Exception as e:
-            logger.error(f"Error reading image file {abs_path}: {str(e)}")
-            # If we fail to read the file, log the error and return an empty string
-            # This will show a broken image in the UI
-            return ""
+        with open(abs_path, 'rb') as img_file:
+            import base64
+            img_data = base64.b64encode(img_file.read()).decode('utf-8')
+            return f"data:image/jpeg;base64,{img_data}"
     except Exception as e:
-        logger.error(f"Error processing file path {file_path}: {str(e)}")
+        logger.error(f"Error reading image file {file_path}: {str(e)}")
+        # If we fail to read the file, log the error and return an empty string
+        # This will show a broken image in the UI
         return ""
     
     return file_path
@@ -169,16 +133,14 @@ def add_landmarks_to_map(m: folium.Map,
             # Get color based on relevance
             color = get_relevance_color(landmark['relevance'])
             coords = landmark['coordinates']
-
             local_url = local_file_to_url(landmark['image_url'])
-            logger.info(f"Cached local_url: {local_url}")
 
             # Create custom popup HTML
             popup_html = f"""
             <div style="width:200px">
                 <h5>{landmark['title']}</h5>
                 <p>{landmark['summary'][:100]}…</p>
-                <img src="{local_url}" width="150px">
+                <img src="{local_url}" width="200px">
                 <p><small>{coords[0]:.5f}, {coords[1]:.5f}</small></p>
             </div>
             """
