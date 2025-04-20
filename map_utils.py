@@ -19,9 +19,8 @@ def create_base_map(center: List[float], zoom: int) -> folium.Map:
         location=st.session_state.map_center,
         zoom_start=st.session_state.zoom_level,
         tiles=get_tile_url(),
-        attr=(
-            "OpenStreetMap" if st.session_state.offline_mode else "Google Maps"
-        ),
+        attr=("OpenStreetMap"
+              if st.session_state.offline_mode else "Google Maps"),
         control_scale=True,
         prefer_canvas=True,  # Use canvas for better performance
         zoom_control=True,  # Enable default zoom control
@@ -87,7 +86,9 @@ def get_relevance_color(relevance: float) -> str:
     else:
         return 'blue'
 
+
 from urllib.parse import quote
+
 
 # Function to convert local file path to a URL
 def local_file_to_url(file_path):
@@ -98,7 +99,8 @@ def local_file_to_url(file_path):
     # URL encode the path
     encoded_path = quote(path_with_forward_slashes)
     # Create proper file URI
-    return f"file:///{encoded_path}"
+    return f"file:/{encoded_path}"
+
 
 def add_landmarks_to_map(m: folium.Map,
                          landmarks: List[Dict],
@@ -118,15 +120,15 @@ def add_landmarks_to_map(m: folium.Map,
             color = get_relevance_color(landmark['relevance'])
             coords = landmark['coordinates']
 
-            # local_url = local_file_to_url(landmark['image_url'])
-            # logger.info(f"Cached local_url: {local_url}")
-            # <img src="{local_url}" width="150px">
+            local_url = local_file_to_url(landmark['image_url'])
+            logger.info(f"Cached local_url: {local_url}")
 
             # Create custom popup HTML
             popup_html = f"""
             <div style="width:200px">
                 <h5>{landmark['title']}</h5>
                 <p>{landmark['summary'][:100]}…</p>
+                <img src="{local_url}" width="150px">
                 <p><small>{coords[0]:.5f}, {coords[1]:.5f}</small></p>
             </div>
             """
@@ -141,7 +143,8 @@ def add_landmarks_to_map(m: folium.Map,
 
             # Add to heatmap data
             heat_data.append([
-                coords[0], coords[1],
+                coords[0],
+                coords[1],
                 landmark['relevance'] * 100  # Scale weight for visibility
             ])
 
