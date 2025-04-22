@@ -9,8 +9,8 @@ st.set_page_config(
 )
 
 from typing import Tuple, List, Dict
-from map_viewer import render_map
-from coord_utils import parse_coordinates, format_dms
+from components.map_viewer import render_map
+from utils.coord_utils import parse_coordinates
 import logging
 
 # Configure logging
@@ -34,27 +34,6 @@ st.markdown(
 """,
     unsafe_allow_html=True,
 )
-
-
-# Add map height control in sidebar
-optimal_height = st.sidebar.number_input("Map Height (pixels)", 
-    min_value=300,
-    max_value=1200,
-    value=st.session_state.get('map_height', 600),
-    step=50)
-
-# Store height in session state
-st.session_state.map_height = optimal_height
-
-# Calculate and set page height for map sizing
-st.session_state.current_page_height = 600  # Default viewport height
-
-# Update session state with viewport height if available
-if 'vh' in st.query_params:
-    st.session_state.current_page_height = int(st.query_params['vh'])
-    logger.info(
-        f"Viewport height set to {st.session_state.current_page_height} pixels."
-    )
 
 # Initialize cache manager
 from cache_manager import OfflineCacheManager
@@ -91,8 +70,6 @@ if "landmarks" not in st.session_state:
     st.session_state.landmarks = []
 if "show_circle" not in st.session_state:
     st.session_state.show_circle = False
-if "offline_mode" not in st.session_state:
-    st.session_state.offline_mode = False
 if "last_data_source" not in st.session_state:
     st.session_state.last_data_source = "Wikipedia"  # Default to Wikipedia
 if "show_markers" not in st.session_state:
@@ -109,7 +86,7 @@ def get_landmarks(
     """
     try:
         landmarks = cache_manager.get_cached_landmarks(bounds)
-        if landmarks or st.session_state.offline_mode or zoom_level < 8:
+        if landmarks:
             return landmarks
 
         if data_source == "Wikipedia":
@@ -175,6 +152,31 @@ with col2:
         "Circle", value=st.session_state.show_circle
     )
 
+coord_input = st.sidebar.text_input(
+    "Custom Location",
+    help="Enter coordinates in either format:\n"
+    + "• Decimal Degrees (DD): 37.3349, -122.0090\n"
+    + "• DMS: 37°20'5.64\"N, 122°0'32.40\"W",
+    label_visibility="collapsed",
+    placeholder="Custom location (DD/DMS)",
+    key="coord_input",
+)
+
+if coord_input:
+    coords = parse_coordinates(coord_input)
+    if coords:
+        if st.sidebar.button("Go to Location"):
+            st.session_state.map_center = [coords.lat, coords.lon]
+            st.session_state.zoom_level = 12
+            # Update URL parameters
+            st.query_params["center"] = f"{coords.lat},{coords.lon}"
+            st.query_params["zoom"] = str(st.session_state.zoom_level)
+            st.rerun()
+    else:
+        st.sidebar.error(
+            "Invalid coordinate format. Please use DD or DMS format."
+        )
+
 try:
     map_data = render_map(
         center=st.session_state.map_center, zoom=st.session_state.zoom_level
@@ -212,7 +214,7 @@ try:
                 bounds_data["_northEast"]["lng"],
             )
 
-    if st.sidebar.button("🔍 Search This Area", type="primary"):
+    if st.sidebar.button("🔍 Search Landmarks", type="primary"):
         update_landmarks()
         st.rerun()
 
@@ -233,42 +235,6 @@ with landmarks_expander:
                     caption=f"[{landmark['title']}]({landmark['url']})",
                     use_container_width=True,
                 )
-
-coord_input = st.sidebar.text_input(
-    "Custom Location",
-    help="Enter coordinates in either format:\n"
-    + "• Decimal Degrees (DD): 37.3349, -122.0090\n"
-    + "• DMS: 37°20'5.64\"N, 122°0'32.40\"W",
-    label_visibility="collapsed",
-    placeholder="Custom location (DD/DMS)",
-    key="coord_input",
-)
-
-if coord_input:
-    coords = parse_coordinates(coord_input)
-    if coords:
-        if st.sidebar.button("Go to Location"):
-            st.session_state.map_center = [coords.lat, coords.lon]
-            st.session_state.zoom_level = 12
-            # Update URL parameters
-            st.query_params["center"] = f"{coords.lat},{coords.lon}"
-            st.query_params["zoom"] = str(st.session_state.zoom_level)
-            st.rerun()
-    else:
-        st.sidebar.error(
-            "Invalid coordinate format. Please use DD or DMS format."
-        )
-
-# Offline Mode Toggle
-offline_mode = st.sidebar.checkbox(
-    "📱 Offline Mode", value=st.session_state.offline_mode
-)
-if offline_mode != st.session_state.offline_mode:
-    st.session_state.offline_mode = offline_mode
-    if offline_mode:
-        st.sidebar.info("🔄 Offline mode enabled. Using cached map data.")
-    else:
-        st.sidebar.info("🌐 Online mode enabled. Fetching live data.")
 
 # Update data source handling and trigger landmark refresh when changed
 data_source = st.sidebar.radio(
