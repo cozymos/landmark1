@@ -9,7 +9,7 @@ st.set_page_config(
 )
 
 from typing import Tuple, List, Dict
-from map_utils import render_map
+from map_viewer import render_map
 from coord_utils import parse_coordinates, format_dms
 import logging
 
