@@ -15,8 +15,7 @@ import logging
 
 # Configure logging
 logging.basicConfig(
-    level=logging.INFO,
-    format="%(name)s:%(levelname)s: %(message)s",
+    level=logging.INFO, format="%(name)s:%(levelname)s: %(message)s"
 )
 logger = logging.getLogger("main")
 logger.debug("*** RERUN ***")
@@ -68,12 +67,8 @@ if "last_bounds" not in st.session_state:
     st.session_state.last_bounds = None
 if "landmarks" not in st.session_state:
     st.session_state.landmarks = []
-if "show_circle" not in st.session_state:
-    st.session_state.show_circle = False
 if "last_data_source" not in st.session_state:
     st.session_state.last_data_source = "Wikipedia"  # Default to Wikipedia
-if "show_markers" not in st.session_state:
-    st.session_state.show_markers = True
 
 
 def get_landmarks(
@@ -138,19 +133,14 @@ def update_landmarks():
         st.error(f"Error fetching landmarks: {str(e)}")
 
 
-# Sidebar controls
-col1, col2 = st.sidebar.columns(2)
-with col1:
-    # Show markers control
-    st.session_state.show_markers = st.checkbox(
-        "Markers", value=st.session_state.show_markers
-    )
-
-with col2:
-    # Show circle control
-    st.session_state.show_circle = st.checkbox(
-        "Circle", value=st.session_state.show_circle
-    )
+# Show circle control
+st.session_state.radius = st.sidebar.number_input(
+    "Show distance circle (km)",
+    min_value=0,
+    max_value=20,
+    value=st.session_state.get("radius", 0),
+    step=1,
+)
 
 coord_input = st.sidebar.text_input(
     "Custom Location",

@@ -132,16 +132,10 @@ def render_map(center: List[float], zoom: int) -> Optional[Dict[str, Any]]:
         m = create_base_map(center, zoom)
 
         if "landmarks" in st.session_state and st.session_state.landmarks:
-            if st.session_state.show_markers:
-                add_landmarks_to_map(m, center, st.session_state.landmarks)
+            add_landmarks_to_map(m, center, st.session_state.landmarks)
 
-        radius_km = 10 if st.session_state.show_circle else 0
-        if radius_km > 0:
-            center = (
-                float(st.session_state.map_center[0]),
-                float(st.session_state.map_center[1]),
-            )
-            draw_distance_circle(m, center, radius_km)
+        if (search_radius := st.session_state.get("radius", 5)) > 0:
+            draw_distance_circle(m, center, search_radius)
 
         # Add layer control with better positioning
         folium.LayerControl(position="topright").add_to(m)
@@ -173,27 +167,28 @@ def local_file_to_url(file_path):
     Convert a file path to a data URL with base64 encoding to work cross-platform
     """
     # Check if it's already a web URL
-    if file_path.startswith('http://') or file_path.startswith('https://'):
+    if file_path.startswith("http://") or file_path.startswith("https://"):
         return file_path
-        
+
     # Strip any existing file:// prefix if present
-    if file_path.startswith('file://'):
+    if file_path.startswith("file://"):
         file_path = file_path[7:]  # Remove 'file://'
-    
+
     try:
         abs_path = os.path.abspath(file_path)
         # Convert the file to a data URL using base64 encoding
         # This works across all platforms and browsers
-        with open(abs_path, 'rb') as img_file:
+        with open(abs_path, "rb") as img_file:
             import base64
-            img_data = base64.b64encode(img_file.read()).decode('utf-8')
+
+            img_data = base64.b64encode(img_file.read()).decode("utf-8")
             return f"data:image/jpeg;base64,{img_data}"
     except Exception as e:
         logger.error(f"Error reading image file {file_path}: {str(e)}")
         # If we fail to read the file, log the error and return an empty string
         # This will show a broken image in the UI
         return ""
-    
+
     return file_path
 
 
@@ -228,15 +223,15 @@ def add_landmarks_to_map(m: folium.Map, center, landmarks: List[Dict]) -> None:
             continue
 
         try:
-            coords = landmark['coordinates']
-            local_url = local_file_to_url(landmark['image_url'])
+            coords = landmark["coordinates"]
+            local_url = local_file_to_url(landmark["image_url"])
 
             # Create custom popup HTML
             popup_html = f"""
             <div style="width:200px">
-                <h5>{landmark['title']}</h5>
+                <h5>{landmark["title"]}</h5>
                 <img src="{local_url}" width="200px">
-                <p>{landmark['summary'][:100]}…</p>
+                <p>{landmark["summary"][:100]}…</p>
                 <p><small>{coords[0]:.5f}, {coords[1]:.5f}</small></p>
             </div>
             """
