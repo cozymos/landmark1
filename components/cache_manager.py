@@ -8,7 +8,7 @@ import hashlib
 import logging
 
 
-class OfflineCacheManager:
+class CacheManager:
 
     def __init__(self):
         self.logger = logging.getLogger("cache")

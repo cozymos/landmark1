@@ -166,6 +166,9 @@ def local_file_to_url(file_path):
     """
     Convert a file path to a data URL with base64 encoding to work cross-platform
     """
+    if not file_path or file_path == "":
+        return ""
+
     # Check if it's already a web URL
     if file_path.startswith("http://") or file_path.startswith("https://"):
         return file_path
@@ -224,7 +227,7 @@ def add_landmarks_to_map(m: folium.Map, center, landmarks: List[Dict]) -> None:
 
         try:
             coords = landmark["coordinates"]
-            local_url = local_file_to_url(landmark["image_url"])
+            local_url = local_file_to_url(landmark.get("image_url", ""))
 
             # Create custom popup HTML
             popup_html = f"""

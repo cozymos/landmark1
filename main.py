@@ -35,9 +35,9 @@ st.markdown(
 )
 
 # Initialize cache manager
-from cache_manager import OfflineCacheManager
+from components.cache_manager import CacheManager
 
-cache_manager = OfflineCacheManager()
+cache_manager = CacheManager()
 
 # Initialize session state with URL parameters if available
 if "map_center" not in st.session_state:
@@ -85,12 +85,12 @@ def get_landmarks(
             return landmarks
 
         if data_source == "Wikipedia":
-            from wiki_handler import WikiLandmarkFetcher
+            from utils.wiki_handler import WikiLandmarkFetcher
 
             wiki_fetcher = WikiLandmarkFetcher()
             landmarks = wiki_fetcher.get_landmarks(bounds)
         else:  # Google Places
-            from google_places import GooglePlacesHandler
+            from utils.google_places import GooglePlacesHandler
 
             places_handler = GooglePlacesHandler()
             landmarks = places_handler.get_landmarks(bounds)
