@@ -34,10 +34,11 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# Initialize cache manager
-from components.cache_manager import CacheManager
+# Initialize cache manager as a singleton
+from components.cache_manager import get_cache_manager_instance
 
-cache_manager = CacheManager()
+# Get the singleton instance - will only be created once
+cache_manager = get_cache_manager_instance()
 
 # Initialize session state with URL parameters if available
 if "map_center" not in st.session_state:

@@ -5,9 +5,21 @@ import requests
 import hashlib
 from typing import Tuple, Dict, List, Any, Optional, Union
 import logging
+import streamlit as st
 
 # Set up logger
 logger = logging.getLogger("cache")
+
+
+# Use Streamlit's caching to ensure singleton pattern
+@st.cache_resource
+def get_cache_manager_instance():
+    """
+    Creates a singleton instance of CacheManager using Streamlit's caching
+    This ensures it's only initialized once per session
+    """
+    logger.debug("Creating new CacheManager instance")
+    return CacheManager()
 
 
 class CacheManager:
