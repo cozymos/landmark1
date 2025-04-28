@@ -1,0 +1,20 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+requirements.txt
+
+.DS_Store
+.vscode/
+*.code-workspace
+*.log
+*.tmp*
+*cache*/
+zset.sh
+.streamlit/config.toml
