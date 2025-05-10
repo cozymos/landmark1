@@ -98,9 +98,16 @@ class CacheManager:
             return ""
 
     def cache_landmarks(
-        self, landmarks: List[Dict], bounds: Tuple[float, float, float, float]
+        self, landmarks: List[Dict], center_coords: Tuple[float, float], radius_km: float
     ):
-        """Cache landmark data and associated images for offline use"""
+        """
+        Cache landmark data and associated images for offline use
+        
+        Args:
+            landmarks: List of landmark dictionaries to cache
+            center_coords: (lat, lon) tuple for the center point
+            radius_km: Radius in kilometers from the center
+        """
         try:
             cache_path = os.path.abspath(
                 os.path.join(self.landmarks_dir, "landmarks.json")
@@ -137,7 +144,8 @@ class CacheManager:
                         {
                             "landmarks": cached_landmarks,
                             "timestamp": time.time(),
-                            "bounds": bounds,
+                            "center": {"lat": center_coords[0], "lon": center_coords[1]},
+                            "radius_km": radius_km,
                         },
                         f,
                         indent=2,
@@ -157,9 +165,18 @@ class CacheManager:
             raise
 
     def get_cached_landmarks(
-        self, bounds: Tuple[float, float, float, float]
+        self, center_coords: Tuple[float, float], radius_km: float
     ) -> List[Dict]:
-        """Retrieve cached landmarks with smart bounds matching"""
+        """
+        Retrieve cached landmarks
+        
+        Args:
+            center_coords: (lat, lon) tuple for the center point
+            radius_km: Radius in kilometers from the center
+            
+        Returns:
+            List of cached landmark dictionaries
+        """
         try:
             cache_path = os.path.join(self.landmarks_dir, "landmarks.json")
             with open(cache_path, "r") as f:

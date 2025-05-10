@@ -68,9 +68,10 @@ st.set_page_config(
 )
 
 from typing import Tuple, List, Dict
-from components.map_viewer import render_map
+from components.map_viewer import render_map, add_landmarks_to_map, draw_distance_circle
 from utils.coord_utils import parse_coordinates
 from utils.config_utils import is_test_mode_enabled
+from components.cache_manager import get_cache_manager_instance
 logger.debug("*** RERUN ***")
 
 # Update CSS for width and margins only
@@ -115,49 +116,54 @@ if "zoom_level" not in st.session_state:
 if "new_zoom" not in st.session_state:
     st.session_state.new_zoom = st.session_state.zoom_level
 
-if "current_bounds" not in st.session_state:
-    st.session_state.current_bounds = None
-if "last_bounds" not in st.session_state:
-    st.session_state.last_bounds = None
+# Initialize radius in session state if not present
+if "radius" not in st.session_state:
+    st.session_state.radius = 5  # Default 5km radius
 if "landmarks" not in st.session_state:
     st.session_state.landmarks = []
 if "last_data_source" not in st.session_state:
-    st.session_state.last_data_source = "Google Places"  # Default to Google Places
+    st.session_state.last_data_source = "Test Mode"  # Default to Test Mode
 
 
 def get_landmarks(
-    bounds: Tuple[float, float, float, float],
+    center_coords: Tuple[float, float],
+    radius_km: float,
     zoom_level: int,
     data_source: str = "Google Places",
 ) -> List[Dict]:
     """
-    Fetch and cache landmarks for the given area using radius-based search
+    Fetch and cache landmarks near the specified center within the given radius
+    
+    Args:
+        center_coords: (lat, lon) tuple for the center point
+        radius_km: Radius in kilometers to search within
+        zoom_level: Current map zoom level (used for caching decisions)
+        data_source: Source of landmark data ("Google Places" or "Test Mode")
+        
+    Returns:
+        List of landmark dictionaries
     """
     try:
-        landmarks = cache_manager.get_cached_landmarks(bounds)
+        # Check cache first
+        cache_manager_instance = get_cache_manager_instance()
+        landmarks = cache_manager_instance.get_cached_landmarks(center_coords, radius_km)
         if landmarks:
             return landmarks
 
-        # Calculate center coordinates and radius from bounds
-        center_lat = (bounds[0] + bounds[2]) / 2
-        center_lon = (bounds[1] + bounds[3]) / 2
-        center_coords = (center_lat, center_lon)
+        # If test mode is selected as data source, don't make API calls
+        if data_source == "Test Mode":
+            # Force enable test mode for this request
+            from utils.config_utils import enable_test_mode
+            enable_test_mode()
         
-        # Calculate radius based on the bounds (diagonal distance / 2)
-        from geopy.distance import distance
-        width = distance((center_lat, bounds[1]), (center_lat, bounds[3])).km
-        height = distance((bounds[0], center_lon), (bounds[2], center_lon)).km
-        import math
-        radius_km = math.sqrt(width**2 + height**2) / 2
-        
-        # Use Google Places API (only option now that wiki_handler is removed)
+        # Use Google Places API
         from components.google_places import GooglePlacesHandler
         places_handler = GooglePlacesHandler()
         landmarks = places_handler.get_landmarks(center_coords, radius_km)
 
         # Cache the landmarks for offline use
         if landmarks:
-            cache_manager.cache_landmarks(landmarks, bounds)
+            cache_manager_instance.cache_landmarks(landmarks, center_coords, radius_km)
 
         return landmarks
 
@@ -168,23 +174,24 @@ def get_landmarks(
 
 def update_landmarks():
     """Update landmarks for the current map view."""
-    if not st.session_state.current_bounds:
-        return
-
     st.session_state.map_center = st.session_state.new_center
     st.session_state.zoom_level = st.session_state.new_zoom
-    bounds = st.session_state.current_bounds
+    
+    # Get radius from UI or calculate based on zoom
+    radius_km = st.session_state.radius if st.session_state.radius > 0 else max(1, 20 - st.session_state.zoom_level)
+    
     try:
         with st.spinner("Fetching landmarks..."):
             landmarks = get_landmarks(
-                bounds,
-                st.session_state.zoom_level,
+                center_coords=st.session_state.map_center,
+                radius_km=radius_km,
+                zoom_level=st.session_state.zoom_level,
                 data_source=st.session_state.last_data_source,
             )
             if landmarks:
                 st.session_state.landmarks = landmarks
-                st.session_state.last_bounds = bounds
 
+        # Update URL parameters
         new_lat = st.session_state.new_center[0]
         new_lng = st.session_state.new_center[1]
         st.query_params["center"] = f"{new_lat},{new_lng}"
@@ -255,14 +262,7 @@ try:
             if new_zoom != st.session_state.zoom_level:
                 st.session_state.new_zoom = new_zoom
 
-        # Update current bounds from map if available
-        if bounds_data and "_southWest" in bounds_data and "_northEast" in bounds_data:
-            st.session_state.current_bounds = (
-                bounds_data["_southWest"]["lat"],
-                bounds_data["_southWest"]["lng"],
-                bounds_data["_northEast"]["lat"],
-                bounds_data["_northEast"]["lng"],
-            )
+        # We don't need to track bounds anymore, using radius-based approach
 
     if st.sidebar.button("🔍 Search Landmarks", type="primary"):
         update_landmarks()
@@ -289,9 +289,10 @@ with landmarks_expander:
 # Update data source handling
 data_source = st.sidebar.radio(
     "Choose Data Source",
-    options=["Google Places"],
-    help="Select where to fetch landmark information from",
+    options=["Test Mode", "Google Places"],
+    help="Select where to fetch landmark information from. Test Mode uses sample data without API calls.",
     key="data_source",
+    index=0  # Default to Test Mode
 )
 
 # Store the selected data source

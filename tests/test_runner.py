@@ -142,7 +142,7 @@ def run_test():
             # Cache landmarks
             print("  Caching landmarks...")
             start = time.time()
-            cache_manager.cache_landmarks(landmarks, test_bounds)
+            cache_manager.cache_landmarks(landmarks, center_coords, radius_km)
             end = time.time()
             print(f"  ✅ PASS: Cached landmarks in {end-start:.2f}s")
             test_results["cache"]["passed"] += 1
@@ -150,7 +150,7 @@ def run_test():
             # Retrieve from cache
             print("  Retrieving cached landmarks...")
             start = time.time()
-            cached = cache_manager.get_cached_landmarks(test_bounds)
+            cached = cache_manager.get_cached_landmarks(center_coords, radius_km)
             end = time.time()
             
             if cached and len(cached) > 0:
