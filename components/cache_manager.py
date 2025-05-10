@@ -25,7 +25,7 @@ def get_cache_manager_instance():
 class CacheManager:
     def __init__(self):
         # Initialize cache directories with absolute paths
-        self.cache_dir = os.path.abspath("cache")
+        self.cache_dir = os.environ.get('CACHE_DIR', os.path.abspath("cache"))
 
         # Cache file paths
         self.landmarks_cache_path = os.path.join(

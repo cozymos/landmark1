@@ -1,24 +1,53 @@
 # Setup before importing streamlit
 import os
 import logging
+import sys
 
-# Check environment variables for configuration
-# Use TEST_MODE=1 to enable test mode
-# Use DEBUG=1 to enable debug logging
-debug_enabled = os.environ.get("DEBUG") == "1"
+# Check for command-line arguments (--test-mode and --debug)
+# Parse command line arguments before initializing streamlit
+test_mode_enabled = False
+debug_enabled = False
 
-# Set up logging level based on environment variable
+# First check environment variables
+if os.environ.get("TEST_MODE") == "1":
+    test_mode_enabled = True
+if os.environ.get("DEBUG") == "1":
+    debug_enabled = True
+
+# Then check command line arguments (they override environment variables)
+# Look for arguments after -- (streamlit passes these through)
+if '--' in sys.argv:
+    args_index = sys.argv.index('--')
+    user_args = sys.argv[args_index+1:]
+    if '--test-mode' in user_args:
+        test_mode_enabled = True
+    if '--debug' in user_args:
+        debug_enabled = True
+
+# Set up logging level based on debug setting
 log_level = logging.DEBUG if debug_enabled else logging.INFO
+
+# Define a filter to exclude noisy DEBUG logs
+class NoiseFilter(logging.Filter):
+    def filter(self, record):
+        # Filter out noisy debug logs from watchdog and urllib3
+        if record.levelno == logging.DEBUG and record.name.startswith(('watchdog', 'urllib3')):
+            return False
+        return True
+
+# Configure logging
 logging.basicConfig(
     level=log_level, format="%(name)s:%(levelname)s: %(message)s"
 )
+# Add the noise filter to the root logger
+logging.getLogger().addFilter(NoiseFilter())
 logger = logging.getLogger("main")
 
-# Import and enable test mode if requested through environment variable
-if os.environ.get("TEST_MODE") == "1":
-    from config_utils import enable_test_mode
+# Import and enable test mode if requested
+if test_mode_enabled:
+    from utils.config_utils import enable_test_mode
     enable_test_mode()
-    logger.info("Test mode enabled via environment variable")
+    logger.info("Test mode enabled")
 
 # Page config must come first after handling command line args
 import streamlit as st
@@ -33,7 +62,7 @@ st.set_page_config(
 from typing import Tuple, List, Dict
 from components.map_viewer import render_map
 from utils.coord_utils import parse_coordinates
-from config_utils import is_test_mode_enabled
+from utils.config_utils import is_test_mode_enabled
 logger.debug("*** RERUN ***")
 
 # Update CSS for width and margins only
@@ -101,16 +130,28 @@ def get_landmarks(
         if landmarks:
             return landmarks
 
+        # Calculate center coordinates and radius from bounds
+        center_lat = (bounds[0] + bounds[2]) / 2
+        center_lon = (bounds[1] + bounds[3]) / 2
+        center_coords = (center_lat, center_lon)
+        
+        # Calculate radius based on the bounds (diagonal distance / 2)
+        from geopy.distance import distance
+        width = distance((center_lat, bounds[1]), (center_lat, bounds[3])).km
+        height = distance((bounds[0], center_lon), (bounds[2], center_lon)).km
+        import math
+        radius_km = math.sqrt(width**2 + height**2) / 2
+        
         if data_source == "Wikipedia":
             from utils.wiki_handler import WikiLandmarkFetcher
 
             wiki_fetcher = WikiLandmarkFetcher()
-            landmarks = wiki_fetcher.get_landmarks(bounds)
+            landmarks = wiki_fetcher.get_landmarks(bounds)  # Wiki still uses bounds
         else:  # Google Places
-            from utils.google_places import GooglePlacesHandler
+            from components.google_places import GooglePlacesHandler
 
             places_handler = GooglePlacesHandler()
-            landmarks = places_handler.get_landmarks(bounds)
+            landmarks = places_handler.get_landmarks(center_coords, radius_km)
 
         # Cache the landmarks for offline use
         if landmarks:

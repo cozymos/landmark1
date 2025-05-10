@@ -5,7 +5,7 @@ import time
 import math
 import geopy.distance
 import logging
-from config_utils import is_test_mode_enabled, get_test_landmarks
+from utils.config_utils import is_test_mode_enabled, get_test_landmarks
 
 class GooglePlacesHandler:
     def __init__(self):
@@ -30,28 +30,49 @@ class GooglePlacesHandler:
             time.sleep(self.min_delay - time_passed)
         self.last_request = time.time()
 
-    def get_landmarks(self, bounds: Tuple[float, float, float, float]) -> List[Dict]:
+    def get_landmarks(self, center_coords: Tuple[float, float], radius_km: float) -> List[Dict]:
         """
-        Fetch landmarks within the given bounds using Google Places API
-        bounds: (south, west, north, east)
+        Fetch landmarks near the specified center within the given radius
+        
+        Args:
+            center_coords: (lat, lon) tuple for the center point
+            radius_km: radius in kilometers to search within
+            
+        Returns:
+            List of landmark dictionaries
         """
         # If in test mode, return test landmarks
         if is_test_mode_enabled():
             logging.debug("Using test landmarks from config")
             test_landmarks = get_test_landmarks()
             
-            center_lat = (bounds[0] + bounds[2]) / 2
-            center_lon = (bounds[1] + bounds[3]) / 2
+            center_lat, center_lon = center_coords
             
             landmarks = []
             for name, landmark in test_landmarks.items():
+                # Calculate distance from center (only in non-test mode)
+                if not is_test_mode_enabled():
+                    distance = geopy.distance.distance(
+                        center_coords,
+                        (landmark['lat'], landmark['lon'])
+                    ).km
+                    
+                    # Only include landmarks within the radius
+                    if distance > radius_km:
+                        continue
+                        
+                    relevance = max(0.1, 1.0 - (distance / radius_km if radius_km > 0 else 0))
+                else:
+                    distance = 0.0
+                    relevance = 1.0
+                
                 landmarks.append({
                     'title': landmark['title'],
                     'summary': f"Test summary for {landmark['title']}",
                     'url': landmark.get('url', ''),
                     'image_url': landmark['image_url'],
-                    'distance': 0.0,
-                    'relevance': 1.0,
+                    'distance': round(distance, 2),
+                    'relevance': round(relevance, 2),
                     'coordinates': (landmark['lat'], landmark['lon'])
                 })
             
@@ -60,27 +81,19 @@ class GooglePlacesHandler:
         # Normal API mode
         self._rate_limit()
 
-        center_lat = (bounds[0] + bounds[2]) / 2
-        center_lon = (bounds[1] + bounds[3]) / 2
+        center_lat, center_lon = center_coords
 
         try:
-            # Calculate the visible area
-            width = geopy.distance.distance(
-                (center_lat, bounds[1]),
-                (center_lat, bounds[3])
-            ).km
-            height = geopy.distance.distance(
-                (bounds[0], center_lon),
-                (bounds[2], center_lon)
-            ).km
-
-            # Search for places in the area
-            location = f"{center_lat},{center_lon}"
-            radius = min(50000, int(math.sqrt(width**2 + height**2) * 500))  # Max 50km radius
+            # Convert radius to meters for the API (max 50km)
+            radius_meters = min(50000, int(radius_km * 1000))
             
+            # Location string for the API
+            location = f"{center_lat},{center_lon}"
+            
+            # Call the Places API
             places_result = self.client.places_nearby(
                 location=location,
-                radius=radius,
+                radius=radius_meters,
                 type=['tourist_attraction', 'landmark', 'museum', 'park']
             )
 
@@ -90,24 +103,21 @@ class GooglePlacesHandler:
                 place_lat = place['geometry']['location']['lat']
                 place_lng = place['geometry']['location']['lng']
                 
-                # Only include places within bounds
-                if (bounds[0] <= place_lat <= bounds[2] and
-                    bounds[1] <= place_lng <= bounds[3]):
-                    
+                # Calculate distance from center
+                distance = geopy.distance.distance(
+                    (center_lat, center_lon),
+                    (place_lat, place_lng)
+                ).km
+                
+                # Only include places within the specified radius
+                if distance <= radius_km:
                     # Get place details for additional information
                     place_details = self.client.place(place['place_id'], fields=[
                         'name', 'formatted_address', 'photo', 'rating', 'url'
                     ])['result']
                     
-                    # Calculate distance from center
-                    distance = geopy.distance.distance(
-                        (center_lat, center_lon),
-                        (place_lat, place_lng)
-                    ).km
-                    
-                    # Calculate relevance score
-                    max_distance = math.sqrt(width**2 + height**2) / 2
-                    base_relevance = 1.0 - (distance / max_distance if max_distance > 0 else 0)
+                    # Calculate relevance score based on distance and rating
+                    base_relevance = 1.0 - (distance / radius_km if radius_km > 0 else 0)
                     rating_factor = place.get('rating', 3.0) / 5.0  # Normalize rating to 0-1
                     relevance = (base_relevance * 0.6) + (rating_factor * 0.4)  # Weighted average
                     relevance = max(0.1, min(1.0, relevance))

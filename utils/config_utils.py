@@ -14,8 +14,10 @@ def is_test_mode_enabled():
 def load_config():
     """Load configuration from config.json"""
     try:
-        # Get the absolute path to the config file
-        config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.json")
+        # Get the absolute path to the config file at project root
+        # Since utils/config_utils.py is in the utils dir, we need to go up one level
+        config_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "config.json")
+        logging.debug(f"Looking for config at: {config_path}")
         with open(config_path, "r") as f:
             return json.load(f)
     except (FileNotFoundError, json.JSONDecodeError) as e:
