@@ -1,4 +1,28 @@
-# Page config must come first
+# Set up command line args before importing streamlit
+import argparse
+import os
+import logging
+
+# Parse command line arguments
+parser = argparse.ArgumentParser(description="Landmarks Locator Application")
+parser.add_argument("--test", action="store_true", help="Enable test mode")
+parser.add_argument("--debug", action="store_true", help="Enable debug logging")
+args, unknown = parser.parse_known_args()
+
+# Set up logging level based on command line argument
+log_level = logging.DEBUG if args and args.debug else logging.INFO
+logging.basicConfig(
+    level=log_level, format="%(name)s:%(levelname)s: %(message)s"
+)
+logger = logging.getLogger("main")
+
+# Import and enable test mode if requested
+if args and args.test:
+    from config_utils import enable_test_mode
+    enable_test_mode()
+    logger.info("Test mode enabled")
+
+# Page config must come first after handling command line args
 import streamlit as st
 
 st.set_page_config(
@@ -11,13 +35,7 @@ st.set_page_config(
 from typing import Tuple, List, Dict
 from components.map_viewer import render_map
 from utils.coord_utils import parse_coordinates
-import logging
-
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO, format="%(name)s:%(levelname)s: %(message)s"
-)
-logger = logging.getLogger("main")
+from config_utils import is_test_mode_enabled
 logger.debug("*** RERUN ***")
 
 # Update CSS for width and margins only

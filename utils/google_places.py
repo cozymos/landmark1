@@ -4,10 +4,21 @@ from typing import Dict, List, Tuple
 import time
 import math
 import geopy.distance
+import logging
+from config_utils import is_test_mode_enabled, get_test_landmarks
 
 class GooglePlacesHandler:
     def __init__(self):
-        self.client = googlemaps.Client(key=os.environ['GOOGLE_MAPS_API_KEY'])
+        # In test mode, we don't need a real API client
+        if not is_test_mode_enabled():
+            try:
+                self.client = googlemaps.Client(key=os.environ['GOOGLE_MAPS_API_KEY'])
+            except KeyError:
+                logging.warning("GOOGLE_MAPS_API_KEY environment variable not set")
+                self.client = None
+        else:
+            self.client = None
+        
         self.last_request = 0
         self.min_delay = 0.1  # Minimum delay between requests in seconds
 
@@ -24,6 +35,29 @@ class GooglePlacesHandler:
         Fetch landmarks within the given bounds using Google Places API
         bounds: (south, west, north, east)
         """
+        # If in test mode, return test landmarks
+        if is_test_mode_enabled():
+            logging.debug("Using test landmarks from config")
+            test_landmarks = get_test_landmarks()
+            
+            center_lat = (bounds[0] + bounds[2]) / 2
+            center_lon = (bounds[1] + bounds[3]) / 2
+            
+            landmarks = []
+            for name, landmark in test_landmarks.items():
+                landmarks.append({
+                    'title': landmark['title'],
+                    'summary': f"Test summary for {landmark['title']}",
+                    'url': landmark.get('url', ''),
+                    'image_url': landmark['image_url'],
+                    'distance': 0.0,
+                    'relevance': 1.0,
+                    'coordinates': (landmark['lat'], landmark['lon'])
+                })
+            
+            return landmarks
+            
+        # Normal API mode
         self._rate_limit()
 
         center_lat = (bounds[0] + bounds[2]) / 2

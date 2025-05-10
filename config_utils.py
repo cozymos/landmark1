@@ -14,7 +14,9 @@ def is_test_mode_enabled():
 def load_config():
     """Load configuration from config.json"""
     try:
-        with open("config.json", "r") as f:
+        # Get the absolute path to the config file
+        config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.json")
+        with open(config_path, "r") as f:
             return json.load(f)
     except (FileNotFoundError, json.JSONDecodeError) as e:
         logging.warning(f"Failed to load config.json: {str(e)}")
