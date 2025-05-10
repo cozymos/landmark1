@@ -7,12 +7,18 @@ import argparse
 from typing import Dict, List, Tuple, Any
 import time
 
-# Add root directory to path for imports
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# Disable Streamlit warnings and debug messages completely before any streamlit-related imports
+logging.getLogger('streamlit').setLevel(logging.ERROR)
+logging.getLogger('watchdog').setLevel(logging.INFO)
+logging.getLogger('urllib3').setLevel(logging.INFO)
+logging.getLogger('PIL').setLevel(logging.INFO)
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG, format="%(name)s:%(levelname)s: %(message)s")
 logger = logging.getLogger("test_runner")
+
+# Add root directory to path for imports
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # Parse command line arguments
 parser = argparse.ArgumentParser(description="Landmark Locator Test Runner")

@@ -27,12 +27,20 @@ if '--' in sys.argv:
 # Set up logging level based on debug setting
 log_level = logging.DEBUG if debug_enabled else logging.INFO
 
-# Define a filter to exclude noisy DEBUG logs
+# Define a filter to exclude noisy logs
 class NoiseFilter(logging.Filter):
     def filter(self, record):
-        # Filter out noisy debug logs from watchdog and urllib3
-        if record.levelno == logging.DEBUG and record.name.startswith(('watchdog', 'urllib3')):
+        # Filter out noisy debug logs
+        if record.levelno == logging.DEBUG and record.name.startswith(('watchdog', 'urllib3', 'PIL')):
             return False
+        
+        # Filter out specific StreamlitAPI warnings
+        if (record.levelno == logging.WARNING and 
+            record.name.startswith('streamlit') and 
+            ('missing ScriptRunContext' in record.getMessage() or
+             'to view this Streamlit app on a browser' in record.getMessage())):
+            return False
+        
         return True
 
 # Configure logging
@@ -114,16 +122,16 @@ if "last_bounds" not in st.session_state:
 if "landmarks" not in st.session_state:
     st.session_state.landmarks = []
 if "last_data_source" not in st.session_state:
-    st.session_state.last_data_source = "Wikipedia"  # Default to Wikipedia
+    st.session_state.last_data_source = "Google Places"  # Default to Google Places
 
 
 def get_landmarks(
     bounds: Tuple[float, float, float, float],
     zoom_level: int,
-    data_source: str = "Wikipedia",
+    data_source: str = "Google Places",
 ) -> List[Dict]:
     """
-    Fetch and cache landmarks for the given area
+    Fetch and cache landmarks for the given area using radius-based search
     """
     try:
         landmarks = cache_manager.get_cached_landmarks(bounds)
@@ -142,16 +150,10 @@ def get_landmarks(
         import math
         radius_km = math.sqrt(width**2 + height**2) / 2
         
-        if data_source == "Wikipedia":
-            from utils.wiki_handler import WikiLandmarkFetcher
-
-            wiki_fetcher = WikiLandmarkFetcher()
-            landmarks = wiki_fetcher.get_landmarks(bounds)  # Wiki still uses bounds
-        else:  # Google Places
-            from components.google_places import GooglePlacesHandler
-
-            places_handler = GooglePlacesHandler()
-            landmarks = places_handler.get_landmarks(center_coords, radius_km)
+        # Use Google Places API (only option now that wiki_handler is removed)
+        from components.google_places import GooglePlacesHandler
+        places_handler = GooglePlacesHandler()
+        landmarks = places_handler.get_landmarks(center_coords, radius_km)
 
         # Cache the landmarks for offline use
         if landmarks:
@@ -253,8 +255,8 @@ try:
             if new_zoom != st.session_state.zoom_level:
                 st.session_state.new_zoom = new_zoom
 
-        # Update current bounds from map
-        if bounds_data:
+        # Update current bounds from map if available
+        if bounds_data and "_southWest" in bounds_data and "_northEast" in bounds_data:
             st.session_state.current_bounds = (
                 bounds_data["_southWest"]["lat"],
                 bounds_data["_southWest"]["lng"],
@@ -284,13 +286,13 @@ with landmarks_expander:
                     use_container_width=True,
                 )
 
-# Update data source handling and trigger landmark refresh when changed
+# Update data source handling
 data_source = st.sidebar.radio(
     "Choose Data Source",
-    options=["Wikipedia", "Google Places"],
+    options=["Google Places"],
     help="Select where to fetch landmark information from",
     key="data_source",
 )
 
-if data_source != st.session_state.last_data_source:
-    st.session_state.last_data_source = data_source
+# Store the selected data source
+st.session_state.last_data_source = data_source

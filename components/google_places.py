@@ -1,5 +1,5 @@
 import os
-import googlemaps
+import googlemaps  # Note: LSP may not detect dynamic methods like places_nearby and place
 from typing import Dict, List, Tuple
 import time
 import math
@@ -46,25 +46,11 @@ class GooglePlacesHandler:
             logging.debug("Using test landmarks from config")
             test_landmarks = get_test_landmarks()
             
-            center_lat, center_lon = center_coords
-            
             landmarks = []
             for name, landmark in test_landmarks.items():
-                # Calculate distance from center (only in non-test mode)
-                if not is_test_mode_enabled():
-                    distance = geopy.distance.distance(
-                        center_coords,
-                        (landmark['lat'], landmark['lon'])
-                    ).km
-                    
-                    # Only include landmarks within the radius
-                    if distance > radius_km:
-                        continue
-                        
-                    relevance = max(0.1, 1.0 - (distance / radius_km if radius_km > 0 else 0))
-                else:
-                    distance = 0.0
-                    relevance = 1.0
+                # In test mode, we use simplified distance and relevance
+                distance = 0.0
+                relevance = 1.0
                 
                 landmarks.append({
                     'title': landmark['title'],
