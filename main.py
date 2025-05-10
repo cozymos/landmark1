@@ -1,26 +1,24 @@
-# Set up command line args before importing streamlit
-import argparse
+# Setup before importing streamlit
 import os
 import logging
 
-# Parse command line arguments
-parser = argparse.ArgumentParser(description="Landmarks Locator Application")
-parser.add_argument("--test", action="store_true", help="Enable test mode")
-parser.add_argument("--debug", action="store_true", help="Enable debug logging")
-args, unknown = parser.parse_known_args()
+# Check environment variables for configuration
+# Use TEST_MODE=1 to enable test mode
+# Use DEBUG=1 to enable debug logging
+debug_enabled = os.environ.get("DEBUG") == "1"
 
-# Set up logging level based on command line argument
-log_level = logging.DEBUG if args and args.debug else logging.INFO
+# Set up logging level based on environment variable
+log_level = logging.DEBUG if debug_enabled else logging.INFO
 logging.basicConfig(
     level=log_level, format="%(name)s:%(levelname)s: %(message)s"
 )
 logger = logging.getLogger("main")
 
-# Import and enable test mode if requested
-if args and args.test:
+# Import and enable test mode if requested through environment variable
+if os.environ.get("TEST_MODE") == "1":
     from config_utils import enable_test_mode
     enable_test_mode()
-    logger.info("Test mode enabled")
+    logger.info("Test mode enabled via environment variable")
 
 # Page config must come first after handling command line args
 import streamlit as st
