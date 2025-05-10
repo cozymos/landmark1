@@ -1,0 +1,35 @@
+{
+  "test_landmarks": {
+    "San Francisco": {
+      "title": "Golden Gate Bridge",
+      "lat": 37.8199,
+      "lon": -122.4783,
+      "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/0c/GoldenGateBridge-001.jpg/1200px-GoldenGateBridge-001.jpg"
+    },
+    "Alcatraz": {
+      "title": "Alcatraz Island",
+      "lat": 37.8267,
+      "lon": -122.4233,
+      "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/c/cb/Alcatraz_Island_aerial_view.jpg/1920px-Alcatraz_Island_aerial_view.jpg"
+    },
+    "Pier39": {
+      "title": "Pier 39",
+      "lat": 37.8087,
+      "lon": -122.4098,
+      "image_url": "https://upload.wikimedia.org/wikipedia/commons/5/56/San_Francisco_from_Forbes_Island_pier_39%2C_544.jpg"
+    },
+    "Lombard": {
+      "title": "Lombard Street",
+      "lat": 37.8021,
+      "lon": -122.4187,
+      "image_url": "https://upload.wikimedia.org/wikipedia/commons/d/d1/Lombard_Street_2020.jpg"
+    }
+  },
+  "test_centers": {
+    "san_francisco": {
+      "lat": 37.7749,
+      "lon": -122.4194,
+      "radius_km": 10
+    }
+  }
+}
