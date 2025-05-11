@@ -7,14 +7,51 @@ import argparse
 from typing import Dict, List, Tuple, Any
 import time
 
-# Disable Streamlit warnings and debug messages completely before any streamlit-related imports
-logging.getLogger('streamlit').setLevel(logging.ERROR)
-logging.getLogger('watchdog').setLevel(logging.INFO)
-logging.getLogger('urllib3').setLevel(logging.INFO)
-logging.getLogger('PIL').setLevel(logging.INFO)
+# Silence all logging before importing modules
+logging.basicConfig(level=logging.CRITICAL)  # Start with all logging disabled
 
-# Configure logging
-logging.basicConfig(level=logging.DEBUG, format="%(name)s:%(levelname)s: %(message)s")
+# Create a custom CacheManager for tests that doesn't use streamlit
+class TestCacheManager:
+    def __init__(self):
+        self.cache_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'cache')
+        self.images_dir = os.path.join(self.cache_dir, 'images')
+        self.landmarks_dir = os.path.join(self.cache_dir, 'landmarks')
+        
+        # Create cache directories if they don't exist
+        os.makedirs(self.images_dir, exist_ok=True)
+        os.makedirs(self.landmarks_dir, exist_ok=True)
+        
+        print("Cache directories initialized")
+    
+    def cache_landmarks(self, landmarks, center_coords, radius_km):
+        """Cache landmark data for testing"""
+        cache_path = os.path.join(self.landmarks_dir, "landmarks.json")
+        with open(cache_path, "w") as f:
+            json.dump({
+                "landmarks": landmarks,
+                "timestamp": time.time(),
+                "center": {"lat": center_coords[0], "lon": center_coords[1]},
+                "radius_km": radius_km,
+            }, f, indent=2)
+        return True
+        
+    def get_cached_landmarks(self, center_coords, radius_km):
+        """Get cached landmarks for testing"""
+        try:
+            cache_path = os.path.join(self.landmarks_dir, "landmarks.json")
+            with open(cache_path, "r") as f:
+                cache_data = json.load(f)
+                return cache_data["landmarks"]
+        except:
+            return []
+
+# Reset logging to desired level
+logging.basicConfig(level=logging.DEBUG, format="%(name)s:%(levelname)s: %(message)s", force=True)
+
+# Disable noisy loggers
+for logger_name in ['streamlit', 'watchdog', 'urllib3', 'PIL', 'werkzeug', 'matplotlib']:
+    logging.getLogger(logger_name).setLevel(logging.CRITICAL)
+    logging.getLogger(logger_name).propagate = False
 logger = logging.getLogger("test_runner")
 
 # Add root directory to path for imports
@@ -36,7 +73,8 @@ enable_test_mode()
 
 # Import app components
 from utils.coord_utils import parse_coordinates, validate_coords
-from components.cache_manager import get_cache_manager_instance
+# We'll use our custom TestCacheManager instead of the regular one with Streamlit dependencies
+# from components.cache_manager import get_cache_manager_instance
 from components.google_places import GooglePlacesHandler
 
 # Set up cache directories to use the top-level ones
@@ -137,7 +175,8 @@ def run_test():
     if args.test in ['all', 'cache'] and landmarks:
         print("\n3. Testing CacheManager...")
         try:
-            cache_manager = get_cache_manager_instance()
+            # Use our custom TestCacheManager that doesn't rely on Streamlit
+            cache_manager = TestCacheManager()
             
             # Cache landmarks
             print("  Caching landmarks...")
