@@ -86,6 +86,12 @@ class GooglePlacesHandler:
             for place in places_result.get('results', []):
                 place_lat = place['geometry']['location']['lat']
                 place_lng = place['geometry']['location']['lng']
+                
+                # Calculate distance from center
+                distance = geopy.distance.distance(
+                    (center_lat, center_lon),
+                    (place_lat, place_lng)
+                ).km
 
                 # Get place details for additional information
                 place_details = self.client.place(place['place_id'], fields=[
