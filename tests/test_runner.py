@@ -4,49 +4,12 @@ import sys
 import json
 import logging
 import argparse
-from typing import Dict, List, Tuple, Any
 import time
 
 # Silence all logging before importing modules
 logging.basicConfig(level=logging.CRITICAL)  # Start with all logging disabled
-
-# Create a custom CacheManager for tests that doesn't use streamlit
-class TestCacheManager:
-    def __init__(self):
-        self.cache_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'cache')
-        self.images_dir = os.path.join(self.cache_dir, 'images')
-        self.landmarks_dir = os.path.join(self.cache_dir, 'landmarks')
-        
-        # Create cache directories if they don't exist
-        os.makedirs(self.images_dir, exist_ok=True)
-        os.makedirs(self.landmarks_dir, exist_ok=True)
-        
-        print("Cache directories initialized")
-    
-    def cache_landmarks(self, landmarks, center_coords, radius_km):
-        """Cache landmark data for testing"""
-        cache_path = os.path.join(self.landmarks_dir, "landmarks.json")
-        with open(cache_path, "w") as f:
-            json.dump({
-                "landmarks": landmarks,
-                "timestamp": time.time(),
-                "center": {"lat": center_coords[0], "lon": center_coords[1]},
-                "radius_km": radius_km,
-            }, f, indent=2)
-        return True
-        
-    def get_cached_landmarks(self, center_coords, radius_km):
-        """Get cached landmarks for testing"""
-        try:
-            cache_path = os.path.join(self.landmarks_dir, "landmarks.json")
-            with open(cache_path, "r") as f:
-                cache_data = json.load(f)
-                return cache_data["landmarks"]
-        except:
-            return []
-
 # Reset logging to desired level
-logging.basicConfig(level=logging.DEBUG, format="%(name)s:%(levelname)s: %(message)s", force=True)
+#logging.basicConfig(level=logging.DEBUG, format="%(name)s:%(levelname)s: %(message)s", force=True)
 
 # Disable noisy loggers
 for logger_name in ['streamlit', 'watchdog', 'urllib3', 'PIL', 'werkzeug', 'matplotlib']:
@@ -73,8 +36,7 @@ enable_test_mode()
 
 # Import app components
 from utils.coord_utils import parse_coordinates, validate_coords
-# We'll use our custom TestCacheManager instead of the regular one with Streamlit dependencies
-# from components.cache_manager import get_cache_manager_instance
+from components.cache_manager import cache_manager
 from components.google_places import GooglePlacesHandler
 
 # Set up cache directories to use the top-level ones
@@ -106,17 +68,6 @@ def run_test():
     radius_km = test_center["radius_km"]
     print(f"Using test center: {center_coords} with radius {radius_km}km")
     
-    # Convert center coordinates to bounds for testing
-    import math
-    south = center_coords[0] - (radius_km / 111.0)  # Approx 1 degree = 111km
-    north = center_coords[0] + (radius_km / 111.0)
-    # Longitude degrees vary based on latitude
-    lng_degree_dist = 111.0 * abs(math.cos(math.radians(center_coords[0])))
-    west = center_coords[1] - (radius_km / lng_degree_dist)
-    east = center_coords[1] + (radius_km / lng_degree_dist)
-    
-    test_bounds = (south, west, north, east)
-    
     # Run coordinate utilities tests if requested
     if args.test in ['all', 'coords']:
         print("\n1. Testing Coordinate Utilities...")
@@ -146,7 +97,7 @@ def run_test():
     landmarks = []
     
     # Run Google Places tests if requested
-    if args.test in ['all', 'places']:
+    if args.test in ['all', 'places', 'cache']:
         print("\n2. Testing GooglePlacesHandler...")
         try:
             places_handler = GooglePlacesHandler()
@@ -175,9 +126,6 @@ def run_test():
     if args.test in ['all', 'cache'] and landmarks:
         print("\n3. Testing CacheManager...")
         try:
-            # Use our custom TestCacheManager that doesn't rely on Streamlit
-            cache_manager = TestCacheManager()
-            
             # Cache landmarks
             print("  Caching landmarks...")
             start = time.time()
@@ -243,7 +191,6 @@ def run_test():
 
 if __name__ == "__main__":
     try:
-        import math
         success = run_test()
         sys.exit(0 if success else 1)
     except Exception as e:

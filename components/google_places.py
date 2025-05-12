@@ -2,8 +2,6 @@ import os
 import googlemaps  # Note: LSP may not detect dynamic methods like places_nearby and place
 from typing import Dict, List, Tuple
 import time
-import math
-import geopy.distance
 import logging
 from utils.config_utils import is_test_mode_enabled, get_test_landmarks
 
@@ -80,7 +78,7 @@ class GooglePlacesHandler:
             places_result = self.client.places_nearby(
                 location=location,
                 radius=radius_meters,
-                type=['tourist_attraction', 'landmark', 'museum', 'park']
+                type=['landmark']
             )
 
             landmarks = []
@@ -88,41 +86,33 @@ class GooglePlacesHandler:
             for place in places_result.get('results', []):
                 place_lat = place['geometry']['location']['lat']
                 place_lng = place['geometry']['location']['lng']
-                
-                # Calculate distance from center
-                distance = geopy.distance.distance(
-                    (center_lat, center_lon),
-                    (place_lat, place_lng)
-                ).km
-                
-                # Only include places within the specified radius
-                if distance <= radius_km:
-                    # Get place details for additional information
-                    place_details = self.client.place(place['place_id'], fields=[
-                        'name', 'formatted_address', 'photo', 'rating', 'url'
-                    ])['result']
-                    
-                    # Calculate relevance score based on distance and rating
-                    base_relevance = 1.0 - (distance / radius_km if radius_km > 0 else 0)
-                    rating_factor = place.get('rating', 3.0) / 5.0  # Normalize rating to 0-1
-                    relevance = (base_relevance * 0.6) + (rating_factor * 0.4)  # Weighted average
-                    relevance = max(0.1, min(1.0, relevance))
 
-                    # Get photo if available
-                    image_url = None
-                    if 'photos' in place_details:
-                        photo_reference = place_details['photos'][0]['photo_reference']
-                        image_url = f"https://maps.googleapis.com/maps/api/place/photo?maxwidth=800&photo_reference={photo_reference}&key={os.environ['GOOGLE_MAPS_API_KEY']}"
+                # Get place details for additional information
+                place_details = self.client.place(place['place_id'], fields=[
+                    'name', 'formatted_address', 'photo', 'rating', 'url'
+                ])['result']
+                
+                # Calculate relevance score based on distance and rating
+                base_relevance = 1.0 - (distance / radius_km if radius_km > 0 else 0)
+                rating_factor = place.get('rating', 3.0) / 5.0  # Normalize rating to 0-1
+                relevance = (base_relevance * 0.6) + (rating_factor * 0.4)  # Weighted average
+                relevance = max(0.1, min(1.0, relevance))
 
-                    landmarks.append({
-                        'title': place['name'],
-                        'summary': place.get('vicinity', ''),
-                        'url': place_details.get('url', ''),
-                        'image_url': image_url,
-                        'distance': round(distance, 2),
-                        'relevance': round(relevance, 2),
-                        'coordinates': (place_lat, place_lng)
-                    })
+                # Get photo if available
+                image_url = None
+                if 'photos' in place_details:
+                    photo_reference = place_details['photos'][0]['photo_reference']
+                    image_url = f"https://maps.googleapis.com/maps/api/place/photo?maxwidth=800&photo_reference={photo_reference}&key={os.environ['GOOGLE_MAPS_API_KEY']}"
+
+                landmarks.append({
+                    'title': place['name'],
+                    'summary': place.get('vicinity', ''),
+                    'url': place_details.get('url', ''),
+                    'image_url': image_url,
+                    'distance': round(distance, 2),
+                    'relevance': round(relevance, 2),
+                    'coordinates': (place_lat, place_lng)
+                })
 
             return landmarks
 

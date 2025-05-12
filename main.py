@@ -1,64 +1,13 @@
-# Setup before importing streamlit
-import os
-import logging
-import sys
-
-# Check for command-line arguments (--test-mode and --debug)
-# Parse command line arguments before initializing streamlit
-test_mode_enabled = False
-debug_enabled = False
-
-# First check environment variables
-if os.environ.get("TEST_MODE") == "1":
-    test_mode_enabled = True
-if os.environ.get("DEBUG") == "1":
-    debug_enabled = True
-
-# Then check command line arguments (they override environment variables)
-# Look for arguments after -- (streamlit passes these through)
-if '--' in sys.argv:
-    args_index = sys.argv.index('--')
-    user_args = sys.argv[args_index+1:]
-    if '--test-mode' in user_args:
-        test_mode_enabled = True
-    if '--debug' in user_args:
-        debug_enabled = True
-
-# Set up logging level based on debug setting
-log_level = logging.DEBUG if debug_enabled else logging.INFO
-
-# Define a filter to exclude noisy logs
-class NoiseFilter(logging.Filter):
-    def filter(self, record):
-        # Filter out noisy debug logs
-        if record.levelno == logging.DEBUG and record.name.startswith(('watchdog', 'urllib3', 'PIL')):
-            return False
-        
-        # Filter out specific StreamlitAPI warnings
-        if (record.levelno == logging.WARNING and 
-            record.name.startswith('streamlit') and 
-            ('missing ScriptRunContext' in record.getMessage() or
-             'to view this Streamlit app on a browser' in record.getMessage())):
-            return False
-        
-        return True
-
-# Configure logging
-logging.basicConfig(
-    level=log_level, format="%(name)s:%(levelname)s: %(message)s"
-)
-# Add the noise filter to the root logger
-logging.getLogger().addFilter(NoiseFilter())
-logger = logging.getLogger("main")
-
-# Import and enable test mode if requested
-if test_mode_enabled:
-    from utils.config_utils import enable_test_mode
-    enable_test_mode()
-    logger.info("Test mode enabled")
-
-# Page config must come first after handling command line args
 import streamlit as st
+from typing import Tuple, List, Dict
+from components.map_viewer import render_map
+from utils.coord_utils import parse_coordinates
+from utils.config_utils import is_test_mode_enabled, enable_test_mode
+from components.cache_manager import cache_manager
+import logging
+
+logger = logging.getLogger("main")
+logger.debug("*** RERUN ***")
 
 st.set_page_config(
     page_title="Landmarks Locator",
@@ -66,13 +15,6 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded",
 )
-
-from typing import Tuple, List, Dict
-from components.map_viewer import render_map, add_landmarks_to_map, draw_distance_circle
-from utils.coord_utils import parse_coordinates
-from utils.config_utils import is_test_mode_enabled
-from components.cache_manager import get_cache_manager_instance
-logger.debug("*** RERUN ***")
 
 # Update CSS for width and margins only
 st.markdown(
@@ -88,31 +30,16 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# Initialize cache manager as a singleton
-from components.cache_manager import get_cache_manager_instance
-
-# Get the singleton instance - will only be created once
-cache_manager = get_cache_manager_instance()
-
 # Initialize session state with URL parameters if available
 if "map_center" not in st.session_state:
-    try:
-        center_str = st.query_params.get("center", "37.7749,-122.4194")
-        lat, lon = map(float, center_str.split(","))
-        st.session_state.map_center = [lat, lon]
-    except:
-        st.session_state.map_center = [
-            37.7749,
-            -122.4194,
-        ]  # Default to San Francisco
+    center_str = st.query_params.get("center", "37.7749,-122.4194")
+    lat, lon = map(float, center_str.split(","))
+    st.session_state.map_center = [lat, lon]
 if "new_center" not in st.session_state:
     st.session_state.new_center = st.session_state.map_center
 
 if "zoom_level" not in st.session_state:
-    try:
-        st.session_state.zoom_level = int(st.query_params.get("zoom", "12"))
-    except:
-        st.session_state.zoom_level = 12
+    st.session_state.zoom_level = int(st.query_params.get("zoom", "12"))
 if "new_zoom" not in st.session_state:
     st.session_state.new_zoom = st.session_state.zoom_level
 
@@ -133,20 +60,19 @@ def get_landmarks(
 ) -> List[Dict]:
     """
     Fetch and cache landmarks near the specified center within the given radius
-    
+
     Args:
         center_coords: (lat, lon) tuple for the center point
         radius_km: Radius in kilometers to search within
         zoom_level: Current map zoom level (used for caching decisions)
         data_source: Source of landmark data ("Google Places" or "Test Mode")
-        
+
     Returns:
         List of landmark dictionaries
     """
     try:
         # Check cache first
-        cache_manager_instance = get_cache_manager_instance()
-        landmarks = cache_manager_instance.get_cached_landmarks(center_coords, radius_km)
+        landmarks = cache_manager.get_cached_landmarks(center_coords, radius_km)
         if landmarks:
             return landmarks
 
@@ -154,16 +80,18 @@ def get_landmarks(
         if data_source == "Test Mode":
             # Force enable test mode for this request
             from utils.config_utils import enable_test_mode
+
             enable_test_mode()
-        
+
         # Use Google Places API
         from components.google_places import GooglePlacesHandler
+
         places_handler = GooglePlacesHandler()
         landmarks = places_handler.get_landmarks(center_coords, radius_km)
 
         # Cache the landmarks for offline use
         if landmarks:
-            cache_manager_instance.cache_landmarks(landmarks, center_coords, radius_km)
+            cache_manager.cache_landmarks(landmarks, center_coords, radius_km)
 
         return landmarks
 
@@ -176,10 +104,14 @@ def update_landmarks():
     """Update landmarks for the current map view."""
     st.session_state.map_center = st.session_state.new_center
     st.session_state.zoom_level = st.session_state.new_zoom
-    
+
     # Get radius from UI or calculate based on zoom
-    radius_km = st.session_state.radius if st.session_state.radius > 0 else max(1, 20 - st.session_state.zoom_level)
-    
+    radius_km = (
+        st.session_state.radius
+        if st.session_state.radius > 0
+        else max(1, 20 - st.session_state.zoom_level)
+    )
+
     try:
         with st.spinner("Fetching landmarks..."):
             landmarks = get_landmarks(
@@ -243,7 +175,6 @@ try:
         # Update center and zoom
         center_data = map_data.get("center")
         new_zoom = map_data.get("zoom")
-        bounds_data = map_data.get("bounds")
 
         if isinstance(center_data, dict):
             new_lat = float(
@@ -261,8 +192,6 @@ try:
             )  # Convert to float first to handle any decimal values
             if new_zoom != st.session_state.zoom_level:
                 st.session_state.new_zoom = new_zoom
-
-        # We don't need to track bounds anymore, using radius-based approach
 
     if st.sidebar.button("🔍 Search Landmarks", type="primary"):
         update_landmarks()
@@ -292,7 +221,7 @@ data_source = st.sidebar.radio(
     options=["Test Mode", "Google Places"],
     help="Select where to fetch landmark information from. Test Mode uses sample data without API calls.",
     key="data_source",
-    index=0  # Default to Test Mode
+    index=0,  # Default to Test Mode
 )
 
 # Store the selected data source

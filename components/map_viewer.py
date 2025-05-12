@@ -150,7 +150,7 @@ def render_map(center: List[float], zoom: int) -> Optional[Dict[str, Any]]:
             m,
             width="100%",
             height=optimal_height,
-            returned_objects=["center", "zoom", "bounds"],
+            returned_objects=["center", "zoom"],
             key="interactive_map",
             use_container_width=True,  # Use full width of container
         )
