@@ -3,6 +3,7 @@ import googlemaps  # Note: LSP may not detect dynamic methods like places_nearby
 from typing import Dict, List, Tuple
 import time
 import logging
+import geopy.distance
 from utils.config_utils import is_test_mode_enabled, get_test_landmarks
 
 class GooglePlacesHandler:
