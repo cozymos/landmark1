@@ -35,7 +35,8 @@ from utils.config_utils import enable_test_mode, load_config, get_test_landmarks
 enable_test_mode()
 
 # Import app components
-from utils.coord_utils import parse_coordinates, validate_coords
+from utils.coord_utils import parse_coordinates, validate_coords, format_dms
+import math
 from components.cache_manager import cache_manager
 from components.google_places import GooglePlacesHandler
 
@@ -72,13 +73,30 @@ def run_test():
     if args.test in ['all', 'coords']:
         print("\n1. Testing Coordinate Utilities...")
         
-        # Test coordinate parsing
+        # Test coordinate parsing (decimal format)
         coords = parse_coordinates(f"{center_coords[0]}, {center_coords[1]}")
         if coords and coords.lat == center_coords[0] and coords.lon == center_coords[1]:
             print("  ✅ PASS: Parse decimal coordinates")
             test_results["coords"]["passed"] += 1
         else:
             print("  ❌ FAIL: Parse decimal coordinates")
+            test_results["coords"]["failed"] += 1
+            all_passed = False
+
+        # Test coordinate parsing (DMS format)
+        dms_str = (
+            f"{format_dms(center_coords[0], True)}, {format_dms(center_coords[1], False)}"
+        )
+        dms_coords = parse_coordinates(dms_str)
+        if (
+            dms_coords
+            and math.isclose(dms_coords.lat, center_coords[0], abs_tol=1e-6)
+            and math.isclose(dms_coords.lon, center_coords[1], abs_tol=1e-6)
+        ):
+            print("  ✅ PASS: Parse DMS coordinates")
+            test_results["coords"]["passed"] += 1
+        else:
+            print("  ❌ FAIL: Parse DMS coordinates")
             test_results["coords"]["failed"] += 1
             all_passed = False
         
