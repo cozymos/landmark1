@@ -236,10 +236,10 @@ col1, col2 = st.sidebar.columns([2, 1])
 with col1:
     st.session_state.radius = st.number_input(
         "Search radius (km)",
-        min_value=0,
-        max_value=20,
-        value=st.session_state.get("radius", 5),
-        step=1,
+        min_value=0.0,
+        max_value=20.0,
+        value=float(st.session_state.get("radius", 5)),
+        step=1.0,
         help=f"Optimal radius for zoom {current_zoom}: {optimal_radius} km"
     )
 
