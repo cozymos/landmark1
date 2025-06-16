@@ -21,11 +21,11 @@ args = "Streamlit App"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "Streamlit App (Test Mode)"
+args = "Run Tests"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "Run Tests"
+args = "Streamlit App (Test Mode)"
 
 [[workflows.workflow]]
 name = "Streamlit App"
@@ -43,15 +43,6 @@ args = "streamlit run main.py"
 waitForPort = 5000
 
 [[workflows.workflow]]
-name = "Streamlit App (Test Mode)"
-author = "agent"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "TEST_MODE=1 DEBUG=1 streamlit run main.py -- --test-mode --debug --server.port=5001 --server.address=\"0.0.0.0\""
-waitForPort = 5001
-
-[[workflows.workflow]]
 name = "Run Tests"
 author = "agent"
 
@@ -59,6 +50,19 @@ author = "agent"
 task = "shell.exec"
 args = "bash -c \"TEST_MODE=1 DEBUG=1 python -m tests.test_runner --test all --verbose\""
 
+[[workflows.workflow]]
+name = "Streamlit App (Test Mode)"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "TEST_MODE=1 DEBUG=1 streamlit run main.py --server.port 5001 --server.address 0.0.0.0"
+waitForPort = 5001
+
 [[ports]]
 localPort = 5000
 externalPort = 80
+
+[[ports]]
+localPort = 5001
+externalPort = 3000
