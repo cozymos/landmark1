@@ -9,6 +9,13 @@ import streamlit as st
 import time
 from typing import Dict, Any, Optional
 import json
+from components.optimization_panel import (
+    render_optimization_metrics,
+    render_customizable_charts,
+    render_advanced_filters,
+    render_machine_learning_insights,
+    render_data_export_tools
+)
 
 
 def render_debug_panel():
@@ -16,16 +23,61 @@ def render_debug_panel():
     Render the main debug panel underneath the map.
     Collapsible by default with grid layout inside.
     """
-    # Debug view selector in sidebar
+    # Enhanced debug view selector in sidebar
     debug_view = st.sidebar.selectbox(
-        "Debug View",
-        ["Overview", "Cache Details", "API Calls", "Session State"],
+        "Debug & Analytics View",
+        [
+            "Overview", 
+            "Cache Details", 
+            "API Calls", 
+            "Session State",
+            "Optimization Metrics",
+            "Custom Charts",
+            "Advanced Filters",
+            "ML Insights",
+            "Data Export"
+        ],
         index=0,
-        help="Select which debug information to display"
+        help="Select which debug and analytics information to display"
     )
     
+    # Enable real-time updates toggle
+    realtime_updates = st.sidebar.checkbox(
+        "Real-time Updates",
+        value=True,
+        help="Automatically refresh debug data"
+    )
+    
+    # Debug panel settings
+    with st.sidebar.expander("Debug Settings", expanded=False):
+        log_level = st.selectbox(
+            "Log Level",
+            ["INFO", "DEBUG", "WARNING", "ERROR"],
+            index=0
+        )
+        
+        max_entries = st.slider(
+            "Max Log Entries",
+            min_value=10,
+            max_value=200,
+            value=50,
+            step=10
+        )
+        
+        show_timestamps = st.checkbox("Show Timestamps", value=True)
+        show_response_times = st.checkbox("Show Response Times", value=True)
+    
+    # Store settings in session state
+    st.session_state.debug_settings = {
+        "log_level": log_level,
+        "max_entries": max_entries,
+        "show_timestamps": show_timestamps,
+        "show_response_times": show_response_times,
+        "realtime_updates": realtime_updates
+    }
+    
     # Main debug container - collapsible by default
-    with st.expander("🐛 Debug Panel", expanded=False):
+    with st.expander("🐛 Debug & Analytics Panel", expanded=False):
         
         if debug_view == "Overview":
             _render_overview()
@@ -35,6 +87,16 @@ def render_debug_panel():
             _render_api_calls()
         elif debug_view == "Session State":
             _render_session_state()
+        elif debug_view == "Optimization Metrics":
+            render_optimization_metrics()
+        elif debug_view == "Custom Charts":
+            render_customizable_charts()
+        elif debug_view == "Advanced Filters":
+            render_advanced_filters()
+        elif debug_view == "ML Insights":
+            render_machine_learning_insights()
+        elif debug_view == "Data Export":
+            render_data_export_tools()
 
 
 def _render_overview():
@@ -82,17 +144,20 @@ def _render_cache_status():
     })
     
     hit_rate = 0
-    if cache_stats["hits"] + cache_stats["misses"] > 0:
-        hit_rate = cache_stats["hits"] / (cache_stats["hits"] + cache_stats["misses"]) * 100
+    hits = int(cache_stats.get("hits", 0) or 0)
+    misses = int(cache_stats.get("misses", 0) or 0)
+    total_cached = int(cache_stats.get("total_cached", 0) or 0)
+    if hits + misses > 0:
+        hit_rate = hits / (hits + misses) * 100
     
     status_color = "🟢" if hit_rate > 50 else "🟡" if hit_rate > 20 else "🔴"
     
     st.markdown(f"""
     <div style="font-size: 12px; line-height: 1.4;">
     {status_color} <strong>Hit Rate:</strong> {hit_rate:.1f}%<br>
-    ✅ <strong>Hits:</strong> {cache_stats["hits"]}<br>
-    ❌ <strong>Misses:</strong> {cache_stats["misses"]}<br>
-    💾 <strong>Cached:</strong> {cache_stats["total_cached"]} items
+    ✅ <strong>Hits:</strong> {hits}<br>
+    ❌ <strong>Misses:</strong> {misses}<br>
+    💾 <strong>Cached:</strong> {total_cached} items
     </div>
     """, unsafe_allow_html=True)
 
@@ -111,18 +176,18 @@ def _render_api_status():
         "error": "🔴", 
         "loading": "🟡",
         "idle": "⚪"
-    }.get(api_stats["last_call_status"], "⚪")
+    }.get(str(api_stats.get("last_call_status", "idle")), "⚪")
     
-    last_call = api_stats["last_call_time"]
+    last_call = api_stats.get("last_call_time")
     time_since = ""
-    if last_call:
-        time_since = f" ({int(time.time() - last_call)}s ago)"
+    if last_call and isinstance(last_call, (int, float)):
+        time_since = f" ({int(time.time() - float(last_call))}s ago)"
     
     st.markdown(f"""
     <div style="font-size: 12px; line-height: 1.4;">
-    {status_icon} <strong>Status:</strong> {api_stats["last_call_status"]}{time_since}<br>
-    🔄 <strong>Calls Made:</strong> {api_stats["google_places_calls"]}<br>
-    ⏱️ <strong>Rate Limit:</strong> {api_stats["rate_limit_remaining"]}<br>
+    {status_icon} <strong>Status:</strong> {api_stats.get("last_call_status", "idle")}{time_since}<br>
+    🔄 <strong>Calls Made:</strong> {api_stats.get("google_places_calls", 0)}<br>
+    ⏱️ <strong>Rate Limit:</strong> {api_stats.get("rate_limit_remaining", "unknown")}<br>
     🌐 <strong>Source:</strong> {st.session_state.get("last_data_source", "Unknown")}
     </div>
     """, unsafe_allow_html=True)
