@@ -275,12 +275,13 @@ def _render_session_state():
     # Filter out large or sensitive data
     filtered_state = {}
     for key, value in st.session_state.items():
-        if key.startswith("_"):  # Skip private streamlit keys
+        key_str = str(key)
+        if key_str.startswith("_"):  # Skip private streamlit keys
             continue
         if isinstance(value, (list, dict)) and len(str(value)) > 1000:
-            filtered_state[key] = f"<Large object: {type(value).__name__} with {len(value) if hasattr(value, '__len__') else '?'} items>"
+            filtered_state[key_str] = f"<Large object: {type(value).__name__} with {len(value) if hasattr(value, '__len__') else '?'} items>"
         else:
-            filtered_state[key] = value
+            filtered_state[key_str] = value
     
     # Display as expandable JSON
     if filtered_state:
